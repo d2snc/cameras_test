@@ -258,7 +258,7 @@ video_writer_thd.start()
 
 print("Usando Picamera2 para captura de frames...")
 print(f"Buffer configurado para {buffer_tamanho_segundos} segundos")
-print("Deteccao: 10 vezes por segundo")
+print("Deteccao: 5 vezes por segundo")
 print("Pressione 'q' para sair, 'g' para gravar manualmente, '+'/'-' para ajustar o buffer")
 
 # Variáveis para estimação de FPS
@@ -357,7 +357,7 @@ while executando:
                 cv2.FONT_HERSHEY_SIMPLEX, 0.7, (150, 150, 150), 2)
     cv2.putText(frame, f"FPS estimado: {fps_medio:.1f}", (10, 260),
                 cv2.FONT_HERSHEY_SIMPLEX, 0.7, (150, 150, 150), 2)
-    cv2.putText(frame, f"Taxa de deteccao: 10 vezes/s", (10, 290),
+    cv2.putText(frame, f"Taxa de deteccao: 5 vezes/s", (10, 290),
                 cv2.FONT_HERSHEY_SIMPLEX, 0.7, (150, 150, 150), 2)
     
     cv2.putText(frame, "g: Gravar manual | +/-: Ajustar buffer | q: Sair", 
