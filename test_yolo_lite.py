@@ -12,8 +12,15 @@ import time
 import threading
 import os
 import subprocess
+import serial
+import time
 from collections import deque
 from datetime import datetime
+
+#Abrindo conexão serial
+ser = serial.Serial('/dev/ttyUSB0', 9600, timeout=1)
+time.sleep(2)
+
 # Importações específicas da Picamera2 (mantidas, serão usadas condicionalmente)
 from picamera2 import Picamera2
 
@@ -104,6 +111,10 @@ def thread_gravacao_video_prioridade(frames_para_gravar, nome_arquivo, fps_grava
         os.nice(-10)
     except:
         pass
+    
+    #Chama o flash para alertar o usuário
+    message = "F" #Pode ser qq msg
+    ser.write(message.encode()) #Envia a msg
     
     # Usar codec XVID que é mais compatível com Raspberry Pi
     fourcc = cv2.VideoWriter_fourcc(*'XVID')
@@ -240,7 +251,7 @@ def detection_thread():
     last_detection_time = 0
     
     # Dimensão reduzida para processamento
-    detection_width, detection_height = 320, 240
+    detection_width, detection_height = 640, 480
     
     while executando:
         current_time = time.time()
@@ -671,7 +682,7 @@ while executando:
         cv2.putText(frame, "SALVANDO VIDEO...", (frame.shape[1]//2 - 150, 40),
                     cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 0, 255), 3)
     
-    cv2.imshow("Deteccao de Bracos Cruzados (YOLOv8)", frame)
+    #cv2.imshow("Deteccao de Bracos Cruzados (YOLOv8)", frame)
     
     key = cv2.waitKey(1) & 0xFF
     if key == ord('q'):
