@@ -1,364 +1,649 @@
 # -*- coding: utf-8 -*-
 """
-Script Principal (versão Raspberry Pi 5):
-Detecção de braços cruzados com YOLOv8 + Picamera2/Webcam
-Gravação de vídeo em buffer circular e acionamento de LED no GPIO 17 (3 s) a
-cada detecção confirmada.
-
-Principais melhorias para o RPi 5 + kit de IA
-─────────────────────────────────────────────
-• Modelo maior (yolov8s‑pose) e imagem de entrada 640×480.
-• Taxa de detecção ↑ para 5 Hz (detection_interval = 0.2 s).
-• Ajustes de paralelismo : torch.set_num_threads(4) e OMP_NUM_THREADS.
-• Otimizações OpenCV (cv2.setUseOptimized(True)).
-• Suporte a GPU/NPU (Torch.compile True se CUDA/Metal/TPU disponível).
-• LED no GPIO 17 aceso por 3 s quando braços cruzados confirmados.
+Script Principal: Captura, detecção e gravação com YOLOv8 + Picamera2/Webcam.
 """
 
-import os
 import cv2
 import numpy as np
 import torch
 from ultralytics import YOLO
 import time
 import threading
+import os
 from collections import deque
 from datetime import datetime
 
-# ───────────────── HARDWARE/DESEMPENHO ────────────────── #
-# Ajuste de threads do Torch/OpenMP para o quad‑core do RPi 5
-os.environ.setdefault("OMP_NUM_THREADS", "4")  # força 4 threads
-torch.set_num_threads(int(os.getenv("OMP_NUM_THREADS", "4")))
-cv2.setUseOptimized(True)
+# -- CONFIGURAÇÕES DE GRAVAÇÃO/DETALHES --
+buffer_tamanho_segundos = 50  # Quantos segundos manter no buffer
+pasta_gravacao = "gravacoes"   # Pasta onde os vídeos serão salvos
+prefixo_arquivo = "braco_cruzado_"
+prefixo_manual = "manual_"
 
-# Tentativa opcional de compilar o modelo para GPU/NPU, se disponível
-TORCH_COMPILE = False  # mude para True se o backend da sua distro suportar
+# -- CONFIGURAÇÃO DE CÂMERA --
+usar_picamera = True  # Flag para escolher entre Picamera ou Webcam
+webcam_id = 0         # ID da webcam (normalmente 0 para a primeira webcam)
+webcam_width = 1280   # Largura para webcam
+webcam_height = 720   # Altura para webcam
+picam_width = 1280    # Largura para PiCamera 
+picam_height = 720    # Altura para PiCamera
 
-# ───────────────── GPIO (LED) ──────────────────────────── #
+# Cria pasta de gravação se não existir
+if not os.path.exists(pasta_gravacao):
+    os.makedirs(pasta_gravacao)
+
+# -- VARIÁVEIS GLOBAIS --
+frame_count = 0
+grava = False               # Indica se deve gravar automaticamente (braços cruzados)
+gravando_video = False      # Indica se já está gravando um vídeo (para não gravar em paralelo)
+detection_interval = 0.2  # 5 detecções por segundo
+bracos_cruzados_start_time = None
+bracos_cruzados_threshold = 0.8  # 1 segundo para considerar braços cruzados
+
+contador_bracos_cruzados = 0
+contador_gravacoes_manuais = 0
+ultimo_estado_gravacao = False
+
+# Variáveis para buffer circular (frames recentes)
+buffer_frames = deque(maxlen=0)  # Será inicializado após conhecer o FPS
+buffer_timestamps = deque(maxlen=0)  # Timestamps correspondentes
+
+# [OTIMIZAÇÃO 7] Modo de visualização reduzida para menor processamento
+modo_visualizacao_completa = True  # Pode ser alterado para False para menos processamento gráfico
+mostrar_diagnostico = True         # Mostrar informações de diagnóstico da detecção
+
+# [OTIMIZAÇÃO 2] Modelo YOLOv8 - mantém o mais leve
+print("Carregando modelo YOLOv8...")
+model = YOLO("yolov8n-pose.pt")  # Modelo mais leve
+
+# Índices de keypoints (modelo COCO-pose)
+LEFT_WRIST = 9
+RIGHT_WRIST = 10
+LEFT_SHOULDER = 5
+RIGHT_SHOULDER = 6
+LEFT_ELBOW = 7
+RIGHT_ELBOW = 8
+NOSE = 0
+
+# Classe para armazenar resultados de detecção
+class DetectionResult:
+    def __init__(self):
+        self.pose_data = []
+        self.braco_cruzado = False
+        self.num_pessoas = 0
+        self.duracao_bracos_cruzados = 0
+
+detection_result = DetectionResult()
+frame_para_detectar = None
+frame_atual = None
+executando = True
+buffer_lock = threading.Lock()
+camera_lock = threading.Lock()
+fps_medio = 30  # Valor inicial, será atualizado durante a execução
+
+# Variáveis de captura
+picam2 = None
+webcam = None
+
+# ───────── GPIO via libgpiod ───────── #
 try:
-    import RPi.GPIO as GPIO
+    import gpiod
 
+    CHIP_NAME = "gpiochip0"         # /dev/gpiochip0
+    LED_LINE_OFFSET = 17            # GPIO-17 (BCM) = pino físico 11
+    chip = gpiod.Chip(CHIP_NAME)
+    led_line = chip.get_line(LED_LINE_OFFSET)
+    led_line.request(
+        consumer="yolo-led",
+        type=gpiod.LINE_REQ_DIR_OUT,
+        default_vals=[0],
+    )
     LED_AVAILABLE = True
-    LED_PIN = 17
-    GPIO.setmode(GPIO.BCM)
-    GPIO.setwarnings(False)
-    GPIO.setup(LED_PIN, GPIO.OUT, initial=GPIO.LOW)
-except (ImportError, RuntimeError):
+except Exception as e:
+    print(f"LED desativado (libgpiod indisponível): {e}")
     LED_AVAILABLE = False
-    LED_PIN = None
-    print("RPi.GPIO não disponível ‑ LED desativado.")
 
-
-# Função que acende o LED por "duration" segundos
-_last_led_pulse = 0.0  # evita múltiplos disparos simultâneos
+_last_led_pulse = 0.0  # evita pulsos sobrepostos
 
 
 def pulse_led(duration: float = 3.0):
+    """Acende o LED por 'duration' s, ignorando pulsos muito próximos."""
     global _last_led_pulse
     if not LED_AVAILABLE:
         return
     now = time.time()
-    if now - _last_led_pulse < 0.2:  # já piscando
+    if now - _last_led_pulse < 0.2:      # já piscando recentemente
         return
     _last_led_pulse = now
-    GPIO.output(LED_PIN, GPIO.HIGH)
+
+    led_line.set_value(1)                # liga LED
 
     def _off():
-        GPIO.output(LED_PIN, GPIO.LOW)
+        led_line.set_value(0)            # apaga LED
 
-    threading.Timer(duration, _off, daemon=True).start()
+    t = threading.Timer(duration, _off)
+    t.daemon = True
+    t.start()
 
 
-# ─────────── CONFIGURAÇÕES DE GRAVAÇÃO/BUFFER ─────────── #
-buffer_tamanho_segundos = 50  # quanto manter no buffer
-pasta_gravacao = "gravacoes"
-prefixo_arquivo = "braco_cruzado_"
-prefixo_manual = "manual_"
+    
+# -- FUNÇÕES DE GRAVAÇÃO --
+def thread_gravacao_video_prioridade(frames_para_gravar, nome_arquivo, fps_gravacao, altura, largura, manual=False):
+    global gravando_video, contador_gravacoes_manuais
+    try:
+        os.nice(-10)
+    except Exception as e:
+        print("Erro ao alterar prioridade:", e)
+    
+    fourcc = cv2.VideoWriter_fourcc(*'XVID')
+    video_writer = cv2.VideoWriter(nome_arquivo, fourcc, fps_gravacao, (largura, altura))
+    print(f"Usando codec XVID para gravar {len(frames_para_gravar)} frames")
+    
+    if not video_writer.isOpened():
+        print(f"Erro: Não foi possível inicializar o VideoWriter para {nome_arquivo}")
+        gravando_video = False
+        return False
+    
+    frame_count_local = 0
+    start_time = time.time()
+    print(f"Iniciando gravação de {len(frames_para_gravar)} frames...")
+    
+    for i, frame in enumerate(frames_para_gravar):
+        if frame is not None:
+            video_writer.write(frame)
+            frame_count_local += 1
+            if len(frames_para_gravar) > 10 and i % (len(frames_para_gravar) // 10) == 0:
+                print(f"Progresso: {i / len(frames_para_gravar) * 100:.1f}% ({i}/{len(frames_para_gravar)} frames)")
+    
+    video_writer.release()
+    tempo_gravacao = time.time() - start_time
+    tipo_gravacao = "manual" if manual else "automática"
+    print(f"Vídeo {tipo_gravacao} salvo: {nome_arquivo}")
+    print(f"Gravados {frame_count_local} frames de {len(frames_para_gravar)} em {tempo_gravacao:.2f} segundos")
+    print(f"Taxa de gravação: {frame_count_local/tempo_gravacao:.2f} fps")
+    
+    gravando_video = False
+    return True
 
-# Cria pasta se não existir
-os.makedirs(pasta_gravacao, exist_ok=True)
+def salvar_buffer_como_video(trigger_frame=None, manual=False):
+    global buffer_frames, buffer_timestamps, gravando_video, contador_gravacoes_manuais, fps_medio
+    
+    if gravando_video:
+        print("Já existe uma gravação em andamento. Aguarde...")
+        return
+    
+    gravando_video = True
+    
+    if manual:
+        contador_gravacoes_manuais += 1
+    
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    prefix = prefixo_manual if manual else prefixo_arquivo
+    nome_arquivo = os.path.join(pasta_gravacao, f"{prefix}{timestamp}.avi")
+    
+    print(f"Tamanho do buffer antes da cópia: {len(buffer_frames)} frames")
+    
+    frames_para_gravar = []
+    with buffer_lock:
+        if len(buffer_frames) == 0:
+            print("ERRO: Buffer vazio, nada para gravar")
+            gravando_video = False
+            return
+        for frame in buffer_frames:
+            frames_para_gravar.append(frame.copy())
+        if trigger_frame is not None:
+            frames_para_gravar.append(trigger_frame.copy())
+    
+    print(f"Frames para gravar após cópia do buffer: {len(frames_para_gravar)}")
+    
+    if len(frames_para_gravar) == 0:
+        print("ERRO: Nenhum frame copiado para gravação")
+        gravando_video = False
+        return
+    
+    altura, largura = frames_para_gravar[0].shape[:2]
+    fps_gravacao = max(10.0, min(fps_medio, 30.0))
+    
+    print(f"Iniciando gravação com {len(frames_para_gravar)} frames a {fps_gravacao:.1f} fps...")
+    print(f"Buffer configurado para {buffer_tamanho_segundos} segundos")
+    
+    threading.Thread(
+        target=thread_gravacao_video_prioridade,
+        args=(frames_para_gravar, nome_arquivo, fps_gravacao, altura, largura, manual),
+        daemon=True
+    ).start()
+    
+    return nome_arquivo
 
-# ───────────── CÂMERAS (PiCam2 ou Webcam) ─────────────── #
-usar_picamera = True
-webcam_id = 0
-webcam_width, webcam_height = 1280, 720
-picam_width, picam_height = 1280, 720
+# Thread que coordena gravação automática
+def video_writer_thread():
+    global executando, grava, ultimo_estado_gravacao
+    ultimo_estado_grava = False
+    ultimo_arquivo_gravado_time = 0
+    min_intervalo_gravacao = 5  # Segundos mínimos entre gravações automáticas
+    while executando:
+        if grava and not ultimo_estado_grava:
+            tempo_atual = time.time()
+            if tempo_atual - ultimo_arquivo_gravado_time >= min_intervalo_gravacao:
+                with buffer_lock:
+                    print(f"Estado do buffer no momento da detecção: {len(buffer_frames)} frames")
+                    if len(buffer_frames) > 0:
+                        buffer_age = tempo_atual - buffer_timestamps[0]
+                        print(f"Buffer contém frames de {buffer_age:.1f} segundos atrás")
+                salvar_buffer_como_video(frame_atual, manual=False)
+                ultimo_arquivo_gravado_time = tempo_atual
+        ultimo_estado_grava = grava
+        time.sleep(0.1)
 
-# ───────────────── DETECÇÃO ────────────────────────────── #
-print("Carregando modelo YOLOv8...")
-model = YOLO("yolov8s-pose.pt")  # modelo maior, mas cabe no RPi 5
-if TORCH_COMPILE and torch.cuda.is_available():
-    model.model = torch.compile(model.model)  # aceleração extra
+# Thread de detecção com frames reduzidos
+def detection_thread():
+    global detection_result, frame_para_detectar, executando
+    global bracos_cruzados_start_time, contador_bracos_cruzados, ultimo_estado_gravacao, grava
+    last_detection_time = 0
+    detection_width, detection_height = 480, 360
+    while executando:
+        try:
+            current_time = time.time()
+            if current_time - last_detection_time >= detection_interval and frame_para_detectar is not None:
+                frame_orig = frame_para_detectar.copy()
+                frame_to_process = cv2.resize(frame_orig, (detection_width, detection_height))
+                try:
+                    results = model(frame_to_process, verbose=False)
+                except Exception as e:
+                    print(f"Erro ao executar modelo YOLOv8: {e}")
+                    results = []
+                last_detection_time = current_time
+                algum_braco_cruzado = False
+                num_pessoas = 0
+                detected_people = []
+                
+                if len(results) > 0 and hasattr(results[0], 'keypoints') and hasattr(results[0].keypoints, 'data') and len(results[0].keypoints.data) > 0:
+                    scale_x = frame_orig.shape[1] / detection_width
+                    scale_y = frame_orig.shape[0] / detection_height
+                    for person in results[0].keypoints.data:
+                        try:
+                            num_pessoas += 1
+                            keypoints = person.cpu().numpy()
+                            required_keypoints = max(LEFT_WRIST, RIGHT_WRIST, LEFT_SHOULDER, RIGHT_SHOULDER, LEFT_ELBOW, RIGHT_ELBOW, NOSE) + 1
+                            if keypoints.shape[0] < required_keypoints:
+                                print(f"Keypoints insuficientes: encontrados {keypoints.shape[0]}, necessários {required_keypoints}")
+                                continue
+                            
+                            left_wrist = keypoints[LEFT_WRIST][:2] * np.array([scale_x, scale_y])
+                            right_wrist = keypoints[RIGHT_WRIST][:2] * np.array([scale_x, scale_y])
+                            left_shoulder = keypoints[LEFT_SHOULDER][:2] * np.array([scale_x, scale_y])
+                            right_shoulder = keypoints[RIGHT_SHOULDER][:2] * np.array([scale_x, scale_y])
+                            left_elbow = keypoints[LEFT_ELBOW][:2] * np.array([scale_x, scale_y])
+                            right_elbow = keypoints[RIGHT_ELBOW][:2] * np.array([scale_x, scale_y])
+                            nose = keypoints[NOSE][:2] * np.array([scale_x, scale_y])
+                            
+                            left_wrist_conf = keypoints[LEFT_WRIST][2]
+                            right_wrist_conf = keypoints[RIGHT_WRIST][2]
+                            left_shoulder_conf = keypoints[LEFT_SHOULDER][2]
+                            right_shoulder_conf = keypoints[RIGHT_SHOULDER][2]
+                            left_elbow_conf = keypoints[LEFT_ELBOW][2]
+                            right_elbow_conf = keypoints[RIGHT_ELBOW][2]
+                            nose_conf = keypoints[NOSE][2]
+                            
+                            lw = (int(left_wrist[0]), int(left_wrist[1]))
+                            rw = (int(right_wrist[0]), int(right_wrist[1]))
+                            ls = (int(left_shoulder[0]), int(left_shoulder[1]))
+                            rs = (int(right_shoulder[0]), int(right_shoulder[1]))
+                            le = (int(left_elbow[0]), int(left_elbow[1]))
+                            re = (int(right_elbow[0]), int(right_elbow[1]))
+                            ns = (int(nose[0]), int(nose[1]))
+                            
+                            debug_info = {}
+                            if (left_wrist_conf > 0.5 and right_wrist_conf > 0.5 and
+                                left_shoulder_conf > 0.5 and right_shoulder_conf > 0.5 and
+                                left_elbow_conf > 0.5 and right_elbow_conf > 0.5 and
+                                nose_conf > 0.5):
+                                
+                                wrists_crossed = (lw[0] > rs[0] and rw[0] < ls[0] and lw[0] > rw[0])
+                                debug_info["cruzados"] = wrists_crossed
+                                arms_above_head = (lw[1] < ns[1] and rw[1] < ns[1])
+                                debug_info["acima_cabeca"] = arms_above_head
+                                wrist_distance_x = abs(lw[0] - rw[0])
+                                close_horizontally = wrist_distance_x < frame_orig.shape[1] * 0.3
+                                debug_info["proximos"] = close_horizontally
+                                
+                                pessoa_braco_cruzado = (wrists_crossed and arms_above_head and close_horizontally)
+                                if pessoa_braco_cruzado:
+                                    algum_braco_cruzado = True
+                            else:
+                                pessoa_braco_cruzado = False
+                                debug_info = {"confianca_baixa": True}
+                            
+                            confidences = {
+                                'left_wrist': left_wrist_conf > 0.5,
+                                'right_wrist': right_wrist_conf > 0.5,
+                                'left_shoulder': left_shoulder_conf > 0.5,
+                                'right_shoulder': right_shoulder_conf > 0.5,
+                                'left_elbow': left_elbow_conf > 0.5,
+                                'right_elbow': right_elbow_conf > 0.5,
+                                'nose': nose_conf > 0.5
+                            }
+                            
+                            detected_people.append({
+                                'keypoints': keypoints,
+                                'braco_cruzado': pessoa_braco_cruzado,
+                                'coords': {
+                                    'left_wrist': lw,
+                                    'right_wrist': rw,
+                                    'left_shoulder': ls,
+                                    'right_shoulder': rs,
+                                    'left_elbow': le,
+                                    'right_elbow': re,
+                                    'nose': ns
+                                },
+                                'confidences': confidences,
+                                'debug_info': debug_info
+                            })
+                        except Exception as e:
+                            print(f"Erro ao processar pessoa: {e}")
+                            continue
+                            
+                if algum_braco_cruzado:
+                    if bracos_cruzados_start_time is None:
+                        bracos_cruzados_start_time = current_time
+                    elif current_time - bracos_cruzados_start_time >= bracos_cruzados_threshold:
+                        grava = True
+                        if not ultimo_estado_gravacao:
+                            contador_bracos_cruzados += 1
+                            pulse_led(3.0)  # aciona LED
+                            ultimo_estado_gravacao = True
+                else:
+                    bracos_cruzados_start_time = None
+                    grava = False
+                    ultimo_estado_gravacao = False
+                
+                braco_cruzado_duracao = 0
+                if bracos_cruzados_start_time is not None:
+                    braco_cruzado_duracao = current_time - bracos_cruzados_start_time
+                
+                detection_result.pose_data = detected_people
+                detection_result.braco_cruzado = algum_braco_cruzado
+                detection_result.num_pessoas = num_pessoas
+                detection_result.duracao_bracos_cruzados = braco_cruzado_duracao
+                
+            time.sleep(0.01)
+        except Exception as e:
+            print(f"Erro na thread de detecção: {e}")
+            time.sleep(0.5)
 
-# Keypoints COCO‑pose
-LEFT_WRIST, RIGHT_WRIST, LEFT_SHOULDER, RIGHT_SHOULDER = 9, 10, 5, 6
-LEFT_ELBOW, RIGHT_ELBOW, NOSE = 7, 8, 0
-
-# Taxa de detecção
-DETECTION_INTERVAL = 0.2  # 5×/s
-DETECTION_SIZE = (640, 480)
-
-# ──────────────── VARIÁVEIS GLOBAIS ───────────────────── #
-frame_count = 0
-fps_medio = 30
-
-# Flags de estado
-executando = True
-gravando_video = False
-
-buffer_frames: deque[np.ndarray]
-buffer_timestamps: deque[float]
-
-buffer_frames = deque(maxlen=int(fps_medio * buffer_tamanho_segundos))
-buffer_timestamps = deque(maxlen=buffer_frames.maxlen)
-
-# Detecção de braços cruzados
-bracos_cruzados_start_time = None
-BRACOS_CROSSED_THRESHOLD = 0.8
-ultimo_estado_gravacao = False
-contador_bracos_cruzados = 0
-contador_gravacoes_manuais = 0
-
-gravar_flag = False  # marca para gravar automaticamente
-
-# Locks
-buffer_lock = threading.Lock()
-camera_lock = threading.Lock()
-
-# Threads (serão inicializadas depois)
-detection_thread_handle: threading.Thread | None = None
-video_writer_thread_handle: threading.Thread | None = None
-
-# Capture devices
-picam2 = None
-webcam = None
-
-# ───────────── FUNÇÕES AUXILIARES ─────────────────────── #
-
+# Funções para inicializar câmeras
 def inicializar_picamera():
     global picam2
     from picamera2 import Picamera2
     if picam2 is not None:
         try:
-            picam2.stop(); picam2.close()
-        except Exception:
+            picam2.stop()
+            picam2.close()
+        except:
             pass
     picam2 = Picamera2()
-    cfg = picam2.create_preview_configuration(
-        main={"format": "RGB888", "size": (picam_width, picam_height)},
-        controls={"FrameRate": 30},
+    config = picam2.create_preview_configuration(
+        main={"format": "RGB888", "size": (picam_width, picam_height)}
     )
-    picam2.configure(cfg)
+    picam2.configure(config)
     picam2.start()
-    print("PiCamera2 iniciada @", picam_width, "×", picam_height)
-
+    print("PiCamera2 inicializada com resolução", picam_width, "x", picam_height)
+    return True
 
 def inicializar_webcam():
     global webcam
     if webcam is not None:
-        webcam.release()
+        try:
+            webcam.release()
+        except:
+            pass
     webcam = cv2.VideoCapture(webcam_id)
     webcam.set(cv2.CAP_PROP_FRAME_WIDTH, webcam_width)
     webcam.set(cv2.CAP_PROP_FRAME_HEIGHT, webcam_height)
     if not webcam.isOpened():
-        raise RuntimeError("Não foi possível abrir a webcam")
-    print("Webcam iniciada @", webcam_width, "×", webcam_height)
+        print("Erro ao abrir webcam!")
+        return False
+    print("Webcam inicializada com resolução", webcam_width, "x", webcam_height)
+    return True
 
+def alternar_camera():
+    global usar_picamera
+    with camera_lock:
+        usar_picamera = not usar_picamera
+        if usar_picamera:
+            if webcam is not None:
+                webcam.release()
+            inicializar_picamera()
+        else:
+            if picam2 is not None:
+                try:
+                    picam2.stop()
+                    picam2.close()
+                except:
+                    pass
+            inicializar_webcam()
+        print(f"Usando {'PiCamera' if usar_picamera else 'Webcam'} para captura")
 
 def capturar_frame():
+    frame = None
     with camera_lock:
         if usar_picamera:
             try:
-                return picam2.capture_array()
+                frame = picam2.capture_array()
             except Exception as e:
-                print("Erro PiCamera:", e)
-                return None
+                print(f"Erro ao capturar frame da PiCamera: {e}")
         else:
-            ret, frm = webcam.read()
-            return frm if ret else None
+            ret, frame = webcam.read()
+            if not ret:
+                print("Erro ao capturar frame da webcam")
+                frame = None
+    return frame
 
-# ─────────────── GRAVAÇÃO DE VÍDEO ────────────────────── #
-
-def thread_gravacao_video(frames, nome, fps, h, w):
-    global gravando_video
-    try:
-        os.nice(-10)
-    except Exception:
-        pass
-    fourcc = cv2.VideoWriter_fourcc(*"XVID")
-    vw = cv2.VideoWriter(nome, fourcc, fps, (w, h))
-    for f in frames:
-        if f is not None:
-            vw.write(f)
-    vw.release()
-    print("Vídeo salvo:", nome)
-    gravando_video = False
-
-
-def salvar_buffer(trigger_frame=None, manual=False):
-    global gravando_video, fps_medio, buffer_frames
-    if gravando_video:
-        return
-    gravando_video = True
-    tm = datetime.now().strftime("%Y%m%d_%H%M%S")
-    prefix = prefixo_manual if manual else prefixo_arquivo
-    nome = os.path.join(pasta_gravacao, f"{prefix}{tm}.avi")
-
-    with buffer_lock:
-        frames = list(buffer_frames)
-    if trigger_frame is not None:
-        frames.append(trigger_frame.copy())
-    if not frames:
-        gravando_video = False
-        return
-
-    h, w = frames[0].shape[:2]
-    fps_out = max(10.0, min(fps_medio, 30.0))
-    threading.Thread(target=thread_gravacao_video, args=(frames, nome, fps_out, h, w), daemon=True).start()
-
-# ───────────────── DETECÇÃO (THREAD) ───────────────────── #
-
-def detection_loop():
-    global bracos_cruzados_start_time, gravar_flag, ultimo_estado_gravacao, contador_bracos_cruzados
-    last_det = 0.0
-    while executando:
-        if time.time() - last_det < DETECTION_INTERVAL:
-            time.sleep(0.01)
-            continue
-        frame = frame_para_detectar  # cópia de referência global
-        if frame is None:
-            continue
-        last_det = time.time()
-        fr_resized = cv2.resize(frame, DETECTION_SIZE)
-        try:
-            results = model(fr_resized, verbose=False)
-        except Exception as e:
-            print("YOLO erro:", e)
-            continue
-        algum_braco = False
-        if results and hasattr(results[0], "keypoints"):
-            scale_x = frame.shape[1] / DETECTION_SIZE[0]
-            scale_y = frame.shape[0] / DETECTION_SIZE[1]
-            for kp in results[0].keypoints.data.cpu().numpy():
-                # salva confiança
-                if kp.shape[0] < RIGHT_WRIST + 1:
-                    continue
-                lw, rw = kp[LEFT_WRIST][:2], kp[RIGHT_WRIST][:2]
-                ls, rs = kp[LEFT_SHOULDER][:2], kp[RIGHT_SHOULDER][:2]
-                lw *= (scale_x, scale_y); rw *= (scale_x, scale_y)
-                ls *= (scale_x, scale_y); rs *= (scale_x, scale_y)
-                wrists_crossed = lw[0] > rs[0] and rw[0] < ls[0] and lw[0] > rw[0]
-                close_horiz = abs(lw[0] - rw[0]) < frame.shape[1] * 0.3
-                arms_above_head = lw[1] < kp[NOSE][1] * scale_y and rw[1] < kp[NOSE][1] * scale_y
-                if wrists_crossed and close_horiz and arms_above_head:
-                    algum_braco = True
-                    break
-        now = time.time()
-        if algum_braco:
-            if bracos_cruzados_start_time is None:
-                bracos_cruzados_start_time = now
-            elif now - bracos_cruzados_start_time >= BRACOS_CROSSED_THRESHOLD:
-                gravar_flag = True
-                if not ultimo_estado_gravacao:
-                    contador_bracos_cruzados += 1
-                    pulse_led(3.0)  # aciona LED
-                ultimo_estado_gravacao = True
-        else:
-            bracos_cruzados_start_time = None
-            gravar_flag = False
-            ultimo_estado_gravacao = False
-
-# ───────────────── COORDENAÇÃO DE GRAVAÇÃO ─────────────── #
-
-def grava_loop():
-    last_video = 0.0
-    MIN_INTERVAL = 5.0
-    while executando:
-        if gravar_flag and not gravando_video and time.time() - last_video > MIN_INTERVAL:
-            salvar_buffer(frame_atual, manual=False)
-            last_video = time.time()
-        time.sleep(0.1)
-
-# ───────────────── INICIALIZAÇÃO ───────────────────────── #
+# Função para inicializar a câmera escolhida
 if usar_picamera:
     inicializar_picamera()
 else:
     inicializar_webcam()
 
-print("▶ Iniciado (RPi 5) – pressione 'q' para sair…")
+# Inicia as threads de detecção e gravação
+detection_th = threading.Thread(target=detection_thread, daemon=True)
+detection_th.start()
+video_writer_thd = threading.Thread(target=video_writer_thread, daemon=True)
+video_writer_thd.start()
 
-# thread detection & grava
-frame_para_detectar = None
-frame_atual = None
+#Mostra ao usuario que o programa iniciou
 
-detection_thread_handle = threading.Thread(target=detection_loop, daemon=True)
-detection_thread_handle.start()
-video_writer_thread_handle = threading.Thread(target=grava_loop, daemon=True)
-video_writer_thread_handle.start()
+print(f"Usando {'PiCamera' if usar_picamera else 'Webcam'} para captura de frames...")
+print(f"Buffer configurado para {buffer_tamanho_segundos} segundos")
+print(f"Detecção: {1/detection_interval:.1f} vezes por segundo")
+print("Pressione 'q' para sair, 'g' para gravar manualmente, '+'/'-' para ajustar o buffer")
+print("'v' para alternar visualização, 'd' para alternar diagnóstico, 'c' para alternar câmera")
 
-# ───────────────── LOOP PRINCIPAL ──────────────────────── #
 frames_ok = 0
 ultimo_frame_time = time.time()
+tamanho_buffer = int(fps_medio * buffer_tamanho_segundos)
+buffer_frames = deque(maxlen=tamanho_buffer)
+buffer_timestamps = deque(maxlen=tamanho_buffer)
+print(f"Tamanho inicial do buffer: {tamanho_buffer} frames")
 
-while True:
+while executando:
+    frame_count += 1
     frame_rgb = capturar_frame()
+    
     if frame_rgb is None:
-        print("Frame nulo – reconectando câmera…")
+        print("Falha ao capturar frame. Tentando novamente...")
         time.sleep(0.1)
         continue
+    
     frame = cv2.flip(frame_rgb, 1)
-    timestamp = time.time()
-
-    # Buffer
+    timestamp_atual = time.time()
     with buffer_lock:
         buffer_frames.append(frame.copy())
-        buffer_timestamps.append(timestamp)
-
-    # Atualiza FPS estimado
+        buffer_timestamps.append(timestamp_atual)
+    
+    tempo_atual = time.time()
     frames_ok += 1
-    if timestamp - ultimo_frame_time >= 1.0:
-        fps_medio = frames_ok / (timestamp - ultimo_frame_time)
-        frames_ok = 0
-        ultimo_frame_time = timestamp
-        # redimensiona buffer
-        novo_max = int(fps_medio * buffer_tamanho_segundos)
-        if novo_max != buffer_frames.maxlen:
+    if tempo_atual - ultimo_frame_time >= 1.0:
+        fps_medio = frames_ok / (tempo_atual - ultimo_frame_time)
+        novo_tamanho_buffer = int(fps_medio * buffer_tamanho_segundos)
+        if abs(novo_tamanho_buffer - len(buffer_frames)) > fps_medio * 0.1:
             with buffer_lock:
-                buffer_frames = deque(buffer_frames, maxlen=novo_max)
-                buffer_timestamps = deque(buffer_timestamps, maxlen=novo_max)
-            print(f"Buffer → {novo_max} frames @ {fps_medio:.1f} fps")
-
-    # torna disponível para detecção
+                novo_buffer = deque(buffer_frames, maxlen=novo_tamanho_buffer)
+                buffer_frames = novo_buffer
+                novo_timestamps = deque(buffer_timestamps, maxlen=novo_tamanho_buffer)
+                buffer_timestamps = novo_timestamps
+            print(f"Buffer redimensionado: {novo_tamanho_buffer} frames ({buffer_tamanho_segundos} seg a {fps_medio:.1f} FPS)")
+        frames_ok = 0
+        ultimo_frame_time = tempo_atual
+    
     frame_atual = frame
     frame_para_detectar = frame
-
-    # Exibição simples (desconto gráfico pesado)
-    cv2.putText(frame, f"FPS {fps_medio:.1f}", (10, 25), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
-    cv2.putText(frame, f"Auto vídeos: {contador_bracos_cruzados}", (10, 50), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
-    cv2.putText(frame, f"LED GPIO17 {'ON' if LED_AVAILABLE and GPIO.input(LED_PIN) else 'OFF'}", (10, 75), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (200, 200, 0), 2)
-
-    cv2.imshow("Detecção de Braços Cruzados", frame)
+    
+    pose_data = detection_result.pose_data
+    num_pessoas = detection_result.num_pessoas
+    braco_cruzado_duracao = detection_result.duracao_bracos_cruzados
+    
+    if modo_visualizacao_completa:
+        for person_data in pose_data:
+            coords = person_data['coords']
+            pessoa_braco_cruzado = person_data['braco_cruzado']
+            confidences = person_data['confidences']
+            
+            if confidences['left_wrist']:
+                cv2.circle(frame, coords['left_wrist'], 8, (255, 0, 0), -1)
+            if confidences['right_wrist']:
+                cv2.circle(frame, coords['right_wrist'], 8, (0, 255, 0), -1)
+            if confidences['left_shoulder']:
+                cv2.circle(frame, coords['left_shoulder'], 8, (0, 0, 255), -1)
+            if confidences['right_shoulder']:
+                cv2.circle(frame, coords['right_shoulder'], 8, (255, 255, 0), -1)
+            if confidences['left_elbow']:
+                cv2.circle(frame, coords['left_elbow'], 8, (0, 255, 255), -1)
+            if confidences['right_elbow']:
+                cv2.circle(frame, coords['right_elbow'], 8, (255, 0, 255), -1)
+            if confidences['nose']:
+                cv2.circle(frame, coords['nose'], 8, (255, 255, 255), -1)
+            
+            status_texto = "Bracos cruzados" if pessoa_braco_cruzado else "Bracos nao cruzados"
+            if confidences['nose']:
+                texto_pos = (coords['nose'][0] - 100, max(20, coords['nose'][1] - 30))
+                cor_status = (0, 255, 0) if pessoa_braco_cruzado else (0, 0, 255)
+                cv2.putText(frame, status_texto, texto_pos, cv2.FONT_HERSHEY_SIMPLEX, 0.5, cor_status, 2)
+            
+            if confidences['left_shoulder'] and confidences['left_elbow']:
+                cv2.line(frame, coords['left_shoulder'], coords['left_elbow'], (255, 255, 255), 2)
+            if confidences['left_elbow'] and confidences['left_wrist']:
+                cv2.line(frame, coords['left_elbow'], coords['left_wrist'], (255, 255, 255), 2)
+            if confidences['right_shoulder'] and confidences['right_elbow']:
+                cv2.line(frame, coords['right_shoulder'], coords['right_elbow'], (255, 255, 255), 2)
+            if confidences['right_elbow'] and confidences['right_wrist']:
+                cv2.line(frame, coords['right_elbow'], coords['right_wrist'], (255, 255, 255), 2)
+            if confidences['left_shoulder'] and confidences['right_shoulder']:
+                cv2.line(frame, coords['left_shoulder'], coords['right_shoulder'], (255, 255, 255), 2)
+            
+            if mostrar_diagnostico and 'debug_info' in person_data:
+                debug_info = person_data['debug_info']
+                y_pos = 350
+                for criterio, resultado in debug_info.items():
+                    status = "SIM" if resultado else "NÃO"
+                    cor = (0, 255, 0) if resultado else (0, 0, 255)
+                    cv2.putText(frame, f"{criterio}: {status}", (10, y_pos),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.6, cor, 2)
+                    y_pos += 30
+            
+        cv2.putText(frame, f"Grava: {grava}", (10, 30),
+                    cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0) if grava else (0, 0, 255), 2)
+        cv2.putText(frame, f"Pessoas detectadas: {num_pessoas}", (10, 70),
+                    cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+        if bracos_cruzados_start_time is not None:
+            cv2.putText(frame, f"Bracos cruzados: {braco_cruzado_duracao:.1f}s", (10, 110),
+                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255), 2)
+        cv2.putText(frame, f"Deteccoes auto: {contador_bracos_cruzados}", (10, 150),
+                    cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 0), 2)
+        cv2.putText(frame, f"Gravacoes manuais: {contador_gravacoes_manuais}", (10, 190),
+                    cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 200, 0), 2)
+        cv2.putText(frame, f"Buffer: {len(buffer_frames)}/{buffer_frames.maxlen} frames", (10, 230),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (150, 150, 150), 2)
+        cv2.putText(frame, f"FPS estimado: {fps_medio:.1f}", (10, 260),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (150, 150, 150), 2)
+        cv2.putText(frame, f"Taxa de detecção: {1/detection_interval:.1f} vezes/s", (10, 290),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (150, 150, 150), 2)
+        cv2.putText(frame, f"Câmera: {'PiCamera' if usar_picamera else 'Webcam'}", (10, 320),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (150, 150, 150), 2)
+    else:
+        for i, person_data in enumerate(pose_data):
+            if person_data['braco_cruzado']:
+                cv2.putText(frame, f"X", (20 + i*30, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+            else:
+                cv2.putText(frame, f"O", (20 + i*30, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+        
+        cv2.putText(frame, f"Pessoas: {num_pessoas} | Gravando: {grava}", (10, 30),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0) if grava else (0, 0, 255), 2)
+        cv2.putText(frame, f"FPS: {fps_medio:.1f} | Det: {1/detection_interval:.1f}/s", (10, frame.shape[0]-50),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (150, 150, 150), 2)
+        cv2.putText(frame, f"Câmera: {'PiCamera' if usar_picamera else 'Webcam'}", (10, frame.shape[0]-80),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (150, 150, 150), 2)
+        with buffer_lock:
+            buffer_age = 0
+            if len(buffer_timestamps) > 0:
+                buffer_age = tempo_atual - buffer_timestamps[0]
+            cv2.putText(frame, f"Buffer: {buffer_age:.0f}s", (10, frame.shape[0]-110),
+                      cv2.FONT_HERSHEY_SIMPLEX, 0.6, (150, 150, 150), 2)
+    
+    cv2.putText(frame, "g: Gravar | +/-: Buffer | v: Vis. | c: Câmera | d: Diag. | q: Sair",
+                (10, frame.shape[0]-20), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (200, 200, 200), 2)
+    
+    if gravando_video:
+        cv2.putText(frame, "SALVANDO VIDEO...", (frame.shape[1]//2 - 150, 40),
+                    cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 0, 255), 3)
+    
+    #Tela de exibicao, comentar abaixo se nao for debugar
+    cv2.imshow("Deteccao de Bracos Cruzados (YOLOv8)", frame)
     key = cv2.waitKey(1) & 0xFF
     if key == ord('q'):
         break
+    elif key in [ord('+'), ord('=')]:
+        buffer_tamanho_segundos += 5
+        novo_tamanho = int(fps_medio * buffer_tamanho_segundos)
+        with buffer_lock:
+            buffer_frames = deque(buffer_frames, maxlen=novo_tamanho)
+            buffer_timestamps = deque(buffer_timestamps, maxlen=novo_tamanho)
+        print(f"Buffer aumentado para {buffer_tamanho_segundos} segundos ({novo_tamanho} frames)")
+    elif key in [ord('-'), ord('_')]:
+        if buffer_tamanho_segundos > 5:
+            buffer_tamanho_segundos -= 5
+            novo_tamanho = int(fps_medio * buffer_tamanho_segundos)
+            with buffer_lock:
+                buffer_frames = deque(buffer_frames, maxlen=novo_tamanho)
+                buffer_timestamps = deque(buffer_timestamps, maxlen=novo_tamanho)
+            print(f"Buffer diminuído para {buffer_tamanho_segundos} segundos ({novo_tamanho} frames)")
     elif key == ord('g'):
-        salvar_buffer(frame.copy(), manual=True); contador_gravacoes_manuais += 1
+        threading.Thread(target=salvar_buffer_como_video, args=(frame.copy(), True), daemon=True).start()
+        print("Gravação manual iniciada")
+    elif key == ord('v'):
+        modo_visualizacao_completa = not modo_visualizacao_completa
+        print(f"Modo de visualização {'completa' if modo_visualizacao_completa else 'simplificada'}")
+    elif key == ord('d'):
+        mostrar_diagnostico = not mostrar_diagnostico
+        print(f"Diagnóstico de detecção {'ativado' if mostrar_diagnostico else 'desativado'}")
+    elif key == ord('c'):
+        alternar_camera()
+    
+    time.sleep(0.001)
 
-# ───────────────── FINALIZAÇÃO ─────────────────────────── #
+print("Finalizando programa...")
 executando = False
-if detection_thread_handle:
-    detection_thread_handle.join(1.0)
-if video_writer_thread_handle:
-    video_writer_thread_handle.join(1.0)
+detection_th.join(timeout=1.0)
+video_writer_thd.join(timeout=1.0)
 
-if LED_AVAILABLE:
-    GPIO.output(LED_PIN, GPIO.LOW)
-    GPIO.cleanup()
+with camera_lock:
+    if picam2 is not None:
+        try:
+            picam2.stop()
+            picam2.close()
+        except:
+            pass
+    if webcam is not None:
+        webcam.release()
 
-if picam2:
-    picam2.stop(); picam2.close()
-if webcam:
-    webcam.release()
 cv2.destroyAllWindows()
-
-print("Programa encerrado. Vida longa ao RPi 5! 😊")
+print("Programa finalizado.")
