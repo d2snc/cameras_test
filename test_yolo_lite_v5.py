@@ -35,7 +35,7 @@ if not os.path.exists(pasta_gravacao):
 frame_count = 0
 grava = False               # Indica se deve gravar automaticamente (braços cruzados)
 gravando_video = False      # Indica se já está gravando um vídeo (para não gravar em paralelo)
-detection_interval = 0.333  # 2 detecções por segundo
+detection_interval = 0.2  # 5 detecções por segundo
 bracos_cruzados_start_time = None
 bracos_cruzados_threshold = 0.8  # 1 segundo para considerar braços cruzados
 
