@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 """
 Script Principal: Captura, detecção e gravação com YOLOv8 + Picamera2/Webcam.
-Comunica via MQTT com o script de serial para enviar/receber comandos.
 """
 
 import cv2
@@ -13,7 +12,6 @@ import threading
 import os
 from collections import deque
 from datetime import datetime
-import paho.mqtt.client as mqtt
 
 # -- CONFIGURAÇÕES DE GRAVAÇÃO/DETALHES --
 buffer_tamanho_segundos = 50  # Quantos segundos manter no buffer
@@ -86,29 +84,6 @@ fps_medio = 30  # Valor inicial, será atualizado durante a execução
 picam2 = None
 webcam = None
 
-# -- CONFIGURAÇÃO MQTT --
-MQTT_BROKER = "localhost"  # Altere se necessário
-MQTT_PORT = 1883
-TOPIC_FROM_SERIAL = "serial/incoming"   # Onde os comandos vindos do serial serão publicados
-TOPIC_TO_SERIAL = "serial/outgoing"       # Onde o main envia comandos para o serial
-
-mqtt_client = mqtt.Client()
-
-def on_mqtt_message(client, userdata, msg):
-    global frame_atual
-    payload = msg.payload.decode("utf-8").strip()
-    print(f"MQTT - Mensagem recebida no tópico {msg.topic}: {payload}")
-    # Quando receber o comando "REC" via MQTT, inicia a gravação manual
-    if payload == "REC":
-        if frame_atual is not None:
-            threading.Thread(target=salvar_buffer_como_video, args=(frame_atual.copy(), True), daemon=True).start()
-            print("Gravação manual iniciada via comando MQTT (REC)")
-
-mqtt_client.on_message = on_mqtt_message
-mqtt_client.connect(MQTT_BROKER, MQTT_PORT, 60)
-mqtt_client.subscribe(TOPIC_FROM_SERIAL)
-mqtt_client.loop_start()
-
 # -- FUNÇÕES DE GRAVAÇÃO --
 def thread_gravacao_video_prioridade(frames_para_gravar, nome_arquivo, fps_gravacao, altura, largura, manual=False):
     global gravando_video, contador_gravacoes_manuais
@@ -155,9 +130,6 @@ def salvar_buffer_como_video(trigger_frame=None, manual=False):
         return
     
     gravando_video = True
-    
-    # Em vez de abrir a porta serial, envia comando via MQTT para o script de serial
-    mqtt_client.publish(TOPIC_TO_SERIAL, "F")
     
     if manual:
         contador_gravacoes_manuais += 1
@@ -435,13 +407,7 @@ detection_th.start()
 video_writer_thd = threading.Thread(target=video_writer_thread, daemon=True)
 video_writer_thd.start()
 
-#Mostra para o usuario q o programa iniciou
-mqtt_client.publish(TOPIC_TO_SERIAL, "F")
-time.sleep(1)
-mqtt_client.publish(TOPIC_TO_SERIAL, "F")
-time.sleep(1)
-mqtt_client.publish(TOPIC_TO_SERIAL, "F")
-time.sleep(1)
+#Mostra ao usuario que o programa iniciou
 
 print(f"Usando {'PiCamera' if usar_picamera else 'Webcam'} para captura de frames...")
 print(f"Buffer configurado para {buffer_tamanho_segundos} segundos")
@@ -587,7 +553,8 @@ while executando:
         cv2.putText(frame, "SALVANDO VIDEO...", (frame.shape[1]//2 - 150, 40),
                     cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 0, 255), 3)
     
-    #cv2.imshow("Deteccao de Bracos Cruzados (YOLOv8)", frame)
+    #Tela de exibicao, comentar abaixo se nao for debugar
+    cv2.imshow("Deteccao de Bracos Cruzados (YOLOv8)", frame)
     key = cv2.waitKey(1) & 0xFF
     if key == ord('q'):
         break
@@ -636,6 +603,4 @@ with camera_lock:
         webcam.release()
 
 cv2.destroyAllWindows()
-mqtt_client.loop_stop()
-mqtt_client.disconnect()
 print("Programa finalizado.")
