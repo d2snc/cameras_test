@@ -203,6 +203,32 @@ def extract_frame_directly(buffer, width, height, format_str):
         return None
 
 # -----------------------------------------------------------------------------------------------
+# Alternative method to get caps without using get_caps_from_pad
+# -----------------------------------------------------------------------------------------------
+def get_pad_caps_directly(pad):
+    """Alternative method to get caps directly from pad."""
+    try:
+        # Try to get current caps
+        caps = pad.get_current_caps()
+        if caps and caps.get_size() > 0:
+            return caps
+        
+        # Try to get allowed caps
+        caps = pad.get_allowed_caps()
+        if caps and caps.get_size() > 0:
+            return caps
+        
+        # Try to query caps
+        caps = pad.query_caps(None)
+        if caps and caps.get_size() > 0:
+            return caps
+            
+        return None
+    except Exception as e:
+        print(f"Error getting caps directly: {e}")
+        return None
+
+# -----------------------------------------------------------------------------------------------
 # User-defined callback function
 # -----------------------------------------------------------------------------------------------
 def app_callback(pad, info, user_data):
@@ -220,51 +246,90 @@ def app_callback(pad, info, user_data):
         print(f"Buffer size: {buffer.get_size()}")
         
         # Try to get caps information
-        caps = get_caps_from_pad(pad)
-        if caps and not user_data.caps_printed:
-            print(f"Caps string: {caps.to_string()}")
-            user_data.caps_printed = True
+        caps_result = None
+        try:
+            caps_result = get_caps_from_pad(pad)
+        except:
+            print("get_caps_from_pad failed, trying alternative method...")
+            caps_result = get_pad_caps_directly(pad)
             
-            # Parse caps to get properties
-            structure = caps.get_structure(0)
-            print(f"Structure name: {structure.get_name()}")
-            print(f"Number of fields: {structure.n_fields()}")
+        if caps_result and not user_data.caps_printed:
+            # Handle if get_caps_from_pad returns a tuple
+            if isinstance(caps_result, tuple):
+                caps = caps_result[0] if caps_result[0] else None
+                print(f"Caps result is tuple: {caps_result}")
+            else:
+                caps = caps_result
             
-            # Print all fields
-            for i in range(structure.n_fields()):
-                field_name = structure.nth_field_name(i)
-                field_value = structure.get_value(field_name)
-                print(f"  {field_name}: {field_value}")
+            if caps:
+                try:
+                    print(f"Caps string: {caps.to_string()}")
+                    user_data.caps_printed = True
+                    
+                    # Parse caps to get properties
+                    structure = caps.get_structure(0)
+                    print(f"Structure name: {structure.get_name()}")
+                    print(f"Number of fields: {structure.n_fields()}")
+                    
+                    # Print all fields
+                    for i in range(structure.n_fields()):
+                        field_name = structure.nth_field_name(i)
+                        field_value = structure.get_value(field_name)
+                        print(f"  {field_name}: {field_value}")
+                except Exception as e:
+                    print(f"Error parsing caps: {e}")
+                    print(f"Caps type: {type(caps)}")
+                    print(f"Caps value: {caps}")
         
         user_data.debug_count += 1
     
     # Try to get video properties
     if not user_data.caps_detected:
         try:
-            caps = get_caps_from_pad(pad)
-            if caps:
-                structure = caps.get_structure(0)
-                user_data.video_width = structure.get_value('width')
-                user_data.video_height = structure.get_value('height')
+            caps_result = None
+            try:
+                caps_result = get_caps_from_pad(pad)
+            except:
+                print("get_caps_from_pad failed for video properties, trying alternative...")
+                caps_result = get_pad_caps_directly(pad)
                 
-                # Try different ways to get format
-                format_string = structure.get_value('format')
-                if not format_string:
-                    # Check if it's under a different name
-                    struct_name = structure.get_name()
-                    if 'video/x-raw' in struct_name:
-                        # Try to extract format from structure
-                        for i in range(structure.n_fields()):
-                            field_name = structure.nth_field_name(i)
-                            if 'format' in field_name.lower():
-                                format_string = structure.get_value(field_name)
-                                break
+            if caps_result:
+                # Handle if get_caps_from_pad returns a tuple
+                if isinstance(caps_result, tuple):
+                    caps = caps_result[0] if caps_result[0] else None
+                    # If tuple has format info as second element
+                    if len(caps_result) > 1 and caps_result[1]:
+                        user_data.video_format = str(caps_result[1])
+                        print(f"Format from caps tuple: {user_data.video_format}")
+                else:
+                    caps = caps_result
                 
-                user_data.video_format = format_string if format_string else 'RGB'
-                user_data.caps_detected = True
-                print(f"\nDetected video properties: {user_data.video_width}x{user_data.video_height}, format: {user_data.video_format}")
+                if caps:
+                    structure = caps.get_structure(0)
+                    user_data.video_width = structure.get_value('width')
+                    user_data.video_height = structure.get_value('height')
+                    
+                    # Try different ways to get format
+                    if not user_data.video_format:
+                        format_string = structure.get_value('format')
+                        if not format_string:
+                            # Check if it's under a different name
+                            struct_name = structure.get_name()
+                            if 'video/x-raw' in struct_name:
+                                # Try to extract format from structure
+                                for i in range(structure.n_fields()):
+                                    field_name = structure.nth_field_name(i)
+                                    if 'format' in field_name.lower():
+                                        format_string = structure.get_value(field_name)
+                                        break
+                        
+                        user_data.video_format = format_string if format_string else 'RGB'
+                    
+                    user_data.caps_detected = True
+                    print(f"\nDetected video properties: {user_data.video_width}x{user_data.video_height}, format: {user_data.video_format}")
         except Exception as e:
             print(f"Failed to get caps from pad: {e}")
+            print(f"Error type: {type(e)}")
             # Use fallback values
             user_data.video_width = 1280
             user_data.video_height = 720
