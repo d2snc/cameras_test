@@ -163,22 +163,17 @@ def app_callback(pad, info, user_data):
 
     user_data.increment()
     
-    # --- AGGRESSIVE DEBUGGING ---
-    # We add a direct probe to see exactly what get_caps_from_pad is returning.
-    format_probe, width_probe, height_probe = get_caps_from_pad(pad)
-    print(f"DEBUG: Caps probe returned - Format: {format_probe}, Width: {width_probe}, Height: {height_probe}")
-    # --- END DEBUGGING ---
-    
-    # If we haven't stored the video dimensions yet, try to get them from the probe.
-    if user_data.width == 0 and width_probe and height_probe and format_probe:
-        print(f"INFO: Storing video properties - {width_probe}x{height_probe}, Format: {format_probe}")
-        user_data.width = width_probe
-        user_data.height = height_probe
-        user_data.format = format_probe
+    # If we haven't stored the video dimensions yet, try to get them.
+    if user_data.width == 0:
+        format, width, height = get_caps_from_pad(pad)
+        if width and height and format:
+            print(f"INFO: Storing video properties - {width}x{height}, Format: {format}")
+            user_data.width = width
+            user_data.height = height
+            user_data.format = format
 
     # Exit early if we still don't have video properties.
     if user_data.width == 0:
-        print("DEBUG: Exiting callback early because video properties are not yet known.")
         return Gst.PadProbeReturn.OK
 
     # Use stored properties from now on
@@ -190,10 +185,14 @@ def app_callback(pad, info, user_data):
     frame = None
     if user_data.use_frame:
         frame = get_numpy_from_buffer(buffer, format, width, height)
-        if frame is not None and frame.size > 0:
-            user_data.frame_buffer.append(frame.copy())
+        # --- AGGRESSIVE DEBUGGING ---
+        # Let's see if the frame object is valid after the conversion attempt.
+        if frame is not None:
+             print(f"DEBUG: get_numpy_from_buffer returned a valid frame of shape {frame.shape}")
+             user_data.frame_buffer.append(frame.copy())
         else:
-            print("Warning: Failed to get a valid frame from buffer.")
+             print("DEBUG: get_numpy_from_buffer returned None. Frame not added to buffer.")
+        # --- END DEBUGGING ---
 
 
     roi = hailo.get_roi_from_buffer(buffer)
