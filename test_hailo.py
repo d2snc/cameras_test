@@ -102,10 +102,15 @@ class user_app_callback_class(app_callback_class):
 
     def save_video_from_buffer(self, width, height, fps):
         """Saves the buffered frames to a video file."""
+        print(f"DEBUG: save_video_from_buffer called. Buffer size: {len(self.frame_buffer)}. is_recording: {self.is_recording}")
         if self.is_recording or len(self.frame_buffer) == 0:
+            if len(self.frame_buffer) == 0:
+                print("ERROR: Video not saved because the frame buffer is empty.")
+            if self.is_recording:
+                print("INFO: Video not saved because a recording is already in progress.")
             return
-        self.is_recording = True
 
+        self.is_recording = True
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = os.path.join(RECORDING_FOLDER, f"{FILE_PREFIX}{timestamp}.avi")
         
@@ -160,7 +165,11 @@ def app_callback(pad, info, user_data):
     frame = None
     if user_data.use_frame and all((format, width, height)):
         frame = get_numpy_from_buffer(buffer, format, width, height)
-        user_data.frame_buffer.append(frame.copy())
+        if frame is not None:
+            user_data.frame_buffer.append(frame.copy())
+        else:
+            print("Warning: Failed to get frame from buffer, frame is None.")
+
 
     roi = hailo.get_roi_from_buffer(buffer)
     detections = roi.get_objects_typed(hailo.HAILO_DETECTION)
