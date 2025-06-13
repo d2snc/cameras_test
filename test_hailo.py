@@ -9,6 +9,7 @@ import time
 import threading
 from collections import deque
 from datetime import datetime
+import gc  # For garbage collection
 
 from hailo_apps_infra.hailo_rpi_common import (
     get_caps_from_pad,
@@ -109,24 +110,34 @@ class user_app_callback_class(app_callback_class):
         self.pose_start_time = None
         self.pose_triggered_this_cycle = False
         self.buffer_lock = threading.Lock()
-        self.frame_count = 0
+        self.total_frames = 0  # Total frames processed
+        self.fps_frame_count = 0  # Frames for FPS calculation
         self.frames_captured = 0
         self.last_fps_time = time.time()
         self.fps = 30.0  # Default FPS
+        self.max_buffer_frames = 1500  # Maximum buffer size to prevent memory issues
         
     def update_fps(self):
         """Calculate current FPS."""
         current_time = time.time()
-        if current_time - self.last_fps_time >= 1.0:
-            self.fps = self.frame_count / (current_time - self.last_fps_time)
-            self.frame_count = 0
+        elapsed = current_time - self.last_fps_time
+        if elapsed >= 1.0:
+            self.fps = self.fps_frame_count / elapsed
+            self.fps_frame_count = 0  # Reset only FPS counter, not total frames
             self.last_fps_time = current_time
-            # Update buffer size based on FPS
-            target_size = int(self.fps * BUFFER_SECONDS)
+            
+            # Update buffer size based on FPS, but with a maximum limit
+            target_size = min(int(self.fps * BUFFER_SECONDS), self.max_buffer_frames)
             if target_size > 0 and self.frame_buffer.maxlen != target_size:
                 with self.buffer_lock:
-                    current_frames = list(self.frame_buffer)
-                    self.frame_buffer = deque(current_frames, maxlen=target_size)
+                    # Don't copy all frames if buffer is too large
+                    if len(self.frame_buffer) > target_size:
+                        # Keep only the most recent frames
+                        temp_list = list(self.frame_buffer)
+                        self.frame_buffer = deque(temp_list[-target_size:], maxlen=target_size)
+                    else:
+                        current_frames = list(self.frame_buffer)
+                        self.frame_buffer = deque(current_frames, maxlen=target_size)
                 print(f"Buffer resized for {self.fps:.1f} FPS: {target_size} frames max")
         return self.fps
         
@@ -157,10 +168,12 @@ class user_app_callback_class(app_callback_class):
 
     def _write_video(self, filename, frames, fps):
         try:
+            start_time = time.time()
             if not frames:
                 print("No frames to write!")
                 return
-                
+            
+            print(f"Starting video write: {len(frames)} frames")
             h, w = frames[0].shape[:2]
             fourcc = cv2.VideoWriter_fourcc(*'XVID')
             out_fps = min(fps, 30.0) if fps > 0 else 30.0
@@ -169,14 +182,32 @@ class user_app_callback_class(app_callback_class):
             if not writer.isOpened():
                 print(f"Error: Could not open video writer")
                 return
+            
+            # Write frames with progress reporting
+            for i, frame in enumerate(frames):
+                # Check if writing is taking too long (timeout after 30 seconds)
+                if time.time() - start_time > 30:
+                    print("Warning: Video writing timeout - saving partial video")
+                    break
                 
-            for frame in frames:
                 # Convert RGB to BGR for OpenCV
                 bgr_frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
                 writer.write(bgr_frame)
+                
+                # Progress report every 100 frames
+                if i % 100 == 0 and i > 0:
+                    elapsed = time.time() - start_time
+                    fps_write = i / elapsed
+                    print(f"Writing progress: {i}/{len(frames)} frames ({fps_write:.1f} fps)")
                     
             writer.release()
+            elapsed_time = time.time() - start_time
             print(f"Video saved successfully: {filename}")
+            print(f"Write time: {elapsed_time:.1f}s for {len(frames)} frames")
+            
+            # Clear references to free memory
+            frames = None
+            
         except Exception as e:
             print(f"Error writing video: {e}")
             import traceback
@@ -190,89 +221,110 @@ class user_app_callback_class(app_callback_class):
 def app_callback(pad, info, user_data):
     buffer = info.get_buffer()
     if not buffer:
-        return Gst.PadProbeReturn.OK
+        # Periodic garbage collection to prevent memory issues
+    if user_data.total_frames % 500 == 0:
+        gc.collect()
+        if user_data.total_frames % 1000 == 0:
+            print(f"System health check - Frames: {user_data.total_frames}, Captured: {user_data.frames_captured}")
+    
+    return Gst.PadProbeReturn.OK
 
     user_data.increment()
-    user_data.frame_count += 1
+    user_data.total_frames += 1
+    user_data.fps_frame_count += 1
     fps = user_data.update_fps()
+    
+    # Skip some frames if FPS is too high to reduce load
+    if fps > 40 and user_data.total_frames % 2 == 0:
+        # Process every other frame when FPS > 40
+        skip_frame = True
+    else:
+        skip_frame = False
     
     # Get video properties
     width, height = 1280, 720
     caps_result = get_caps_from_pad(pad)
     if isinstance(caps_result, tuple) and len(caps_result) >= 3:
         format_str, width, height = caps_result
-        if user_data.frame_count == 1:
+        if user_data.total_frames == 1:
             print(f"Video properties: {width}x{height}, format: {format_str}")
     
-    # Extract frame - try Hailo method first, then direct extraction
+    # Extract frame only if not skipping
     frame = None
-    
-    # Method 1: Try the Hailo library function
-    if frame is None:
+    if not skip_frame:
+        # Method 1: Try the Hailo library function
         try:
             frame = get_numpy_from_buffer(buffer, 'RGB', width, height)
             if frame is not None and user_data.frames_captured == 0:
                 print(f"Success: get_numpy_from_buffer worked!")
         except:
             pass
-    
-    # Method 2: Direct extraction (this should work given your buffer size)
-    if frame is None:
-        frame = extract_rgb_frame_from_buffer(buffer, width, height)
-        if frame is not None and user_data.frames_captured == 0:
-            print(f"Success: Direct buffer extraction worked! Shape: {frame.shape}")
-    
-    # Add frame to buffer if we got one
-    if frame is not None:
-        with user_data.buffer_lock:
-            user_data.frame_buffer.append(frame.copy())
-            user_data.frames_captured += 1
         
-        if user_data.frame_count % 100 == 0:
-            buffer_len = len(user_data.frame_buffer)
-            print(f"Frame {user_data.frame_count}: Buffer has {buffer_len} frames, FPS: {fps:.1f}")
-    else:
-        if user_data.frame_count <= 5:
-            buffer_size = buffer.get_size()
-            print(f"Frame {user_data.frame_count}: Failed to extract. Buffer size: {buffer_size}")
+        # Method 2: Direct extraction
+        if frame is None:
+            frame = extract_rgb_frame_from_buffer(buffer, width, height)
+            if frame is not None and user_data.frames_captured == 0:
+                print(f"Success: Direct buffer extraction worked! Shape: {frame.shape}")
+        
+        # Add frame to buffer if we got one
+        if frame is not None:
+            with user_data.buffer_lock:
+                # Check buffer health
+                if len(user_data.frame_buffer) >= user_data.max_buffer_frames:
+                    print(f"Warning: Buffer at maximum capacity ({user_data.max_buffer_frames} frames)")
+                user_data.frame_buffer.append(frame.copy())
+                user_data.frames_captured += 1
+            
+            # Clean up frame reference
+            del frame
+            
+            if user_data.total_frames % 100 == 0:
+                buffer_len = len(user_data.frame_buffer)
+                print(f"Frame {user_data.total_frames}: Buffer has {buffer_len} frames, FPS: {fps:.1f}")
+        else:
+            if user_data.total_frames <= 5:
+                buffer_size = buffer.get_size()
+                print(f"Frame {user_data.total_frames}: Failed to extract. Buffer size: {buffer_size}")
     
     # Process pose detection
     roi = hailo.get_roi_from_buffer(buffer)
     detections = roi.get_objects_typed(hailo.HAILO_DETECTION)
     arms_crossed_detected = False
     
-    for detection in detections:
-        if detection.get_label() == "person":
-            landmarks = detection.get_objects_typed(hailo.HAILO_LANDMARKS)
-            if not landmarks: continue
-            
-            points = landmarks[0].get_points()
-            keypoints = {}
-            keypoint_indices = {
-                'nose': 0, 'left_wrist': 9, 'right_wrist': 10,
-                'left_shoulder': 5, 'right_shoulder': 6
-            }
-            
-            bbox = detection.get_bbox()
-            for name, idx in keypoint_indices.items():
-                point = points[idx]
-                if point.confidence() > POSE_CONFIDENCE_THRESHOLD:
-                    keypoints[name] = (
-                        int((point.x() * bbox.width() + bbox.xmin()) * width),
-                        int((point.y() * bbox.height() + bbox.ymin()) * height)
-                    )
-            
-            if all(k in keypoints for k in keypoint_indices.keys()):
-                lw, rw = keypoints['left_wrist'], keypoints['right_wrist']
-                ls, rs = keypoints['left_shoulder'], keypoints['right_shoulder']
-                ns = keypoints['nose']
+    # Only process pose detection every few frames if FPS is high
+    if user_data.total_frames % (2 if fps > 40 else 1) == 0:
+        for detection in detections:
+            if detection.get_label() == "person":
+                landmarks = detection.get_objects_typed(hailo.HAILO_LANDMARKS)
+                if not landmarks: continue
                 
-                wrists_crossed = lw[0] > rs[0] and rw[0] < ls[0]
-                arms_above_head = lw[1] < ns[1] and rw[1] < ns[1]
+                points = landmarks[0].get_points()
+                keypoints = {}
+                keypoint_indices = {
+                    'nose': 0, 'left_wrist': 9, 'right_wrist': 10,
+                    'left_shoulder': 5, 'right_shoulder': 6
+                }
                 
-                if wrists_crossed and arms_above_head:
-                    arms_crossed_detected = True
-                    break
+                bbox = detection.get_bbox()
+                for name, idx in keypoint_indices.items():
+                    point = points[idx]
+                    if point.confidence() > POSE_CONFIDENCE_THRESHOLD:
+                        keypoints[name] = (
+                            int((point.x() * bbox.width() + bbox.xmin()) * width),
+                            int((point.y() * bbox.height() + bbox.ymin()) * height)
+                        )
+                
+                if all(k in keypoints for k in keypoint_indices.keys()):
+                    lw, rw = keypoints['left_wrist'], keypoints['right_wrist']
+                    ls, rs = keypoints['left_shoulder'], keypoints['right_shoulder']
+                    ns = keypoints['nose']
+                    
+                    wrists_crossed = lw[0] > rs[0] and rw[0] < ls[0]
+                    arms_above_head = lw[1] < ns[1] and rw[1] < ns[1]
+                    
+                    if wrists_crossed and arms_above_head:
+                        arms_crossed_detected = True
+                        break
     
     # Handle pose detection timing
     if arms_crossed_detected:
@@ -280,7 +332,7 @@ def app_callback(pad, info, user_data):
             user_data.pose_start_time = time.time()
             print("Arms crossed pose detected!")
         elif time.time() - user_data.pose_start_time >= POSE_DURATION_SECONDS:
-            if not user_data.pose_triggered_this_cycle:
+            if not user_data.pose_triggered_this_cycle and not user_data.is_recording:
                 buffer_len = len(user_data.frame_buffer)
                 print(f"Pose held for {POSE_DURATION_SECONDS}s! Triggering save. Buffer: {buffer_len} frames")
                 user_data.pulse_led()
@@ -292,12 +344,18 @@ def app_callback(pad, info, user_data):
             user_data.pose_start_time = None
             user_data.pose_triggered_this_cycle = False
     
-    # Display handling
-    if frame is not None and user_data.use_frame:
+    # Display handling - only update display every few frames if FPS is high
+    if frame is not None and user_data.use_frame and (user_data.total_frames % (3 if fps > 40 else 1) == 0):
         display_frame = frame.copy()
         if arms_crossed_detected:
             cv2.putText(display_frame, "ARMS CROSSED!", (50, 50), 
                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+        
+        # Add FPS and buffer info
+        cv2.putText(display_frame, f"FPS: {fps:.1f}", (width - 150, 30), 
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+        cv2.putText(display_frame, f"Buffer: {len(user_data.frame_buffer)}", (width - 150, 60), 
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
         
         # Convert to BGR for display
         bgr_frame = cv2.cvtColor(display_frame, cv2.COLOR_RGB2BGR)
@@ -319,16 +377,35 @@ if __name__ == "__main__":
     print(f"Buffer will hold up to {BUFFER_SECONDS} seconds of video")
     print(f"Pose must be held for {POSE_DURATION_SECONDS} seconds to trigger recording")
     print("Cross your arms above your head to trigger recording!")
+    print("Press Ctrl+C to stop...")
     
-    app = GStreamerPoseEstimationApp(app_callback, user_data)
-    app.run()
-    
-    print(f"\nShutting down...")
-    print(f"Total frames processed: {user_data.frame_count}")
-    print(f"Frames captured to buffer: {user_data.frames_captured}")
-    
-    if LED_AVAILABLE:
-        led_line.set_value(0)
-        led_line.release()
-        chip.close()
-        print("GPIO cleaned up.")
+    try:
+        app = GStreamerPoseEstimationApp(app_callback, user_data)
+        app.run()
+    except KeyboardInterrupt:
+        print("\nStopping application...")
+    except Exception as e:
+        print(f"\nError: {e}")
+        import traceback
+        traceback.print_exc()
+    finally:
+        print(f"\nShutting down...")
+        print(f"Total frames processed: {getattr(user_data, 'total_frames', 0)}")
+        print(f"Frames captured to buffer: {user_data.frames_captured}")
+        
+        # Wait for any ongoing recording to finish
+        if user_data.is_recording:
+            print("Waiting for video recording to complete...")
+            timeout = 10
+            start = time.time()
+            while user_data.is_recording and time.time() - start < timeout:
+                time.sleep(0.5)
+        
+        if LED_AVAILABLE:
+            led_line.set_value(0)
+            led_line.release()
+            chip.close()
+            print("GPIO cleaned up.")
+        
+        # Final garbage collection
+        gc.collect()
