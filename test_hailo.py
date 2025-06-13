@@ -165,10 +165,12 @@ def app_callback(pad, info, user_data):
     frame = None
     if user_data.use_frame and all((format, width, height)):
         frame = get_numpy_from_buffer(buffer, format, width, height)
-        if frame is not None:
+        # CRITICAL FIX: Ensure the frame is valid before appending to buffer
+        if frame is not None and frame.size > 0:
             user_data.frame_buffer.append(frame.copy())
         else:
-            print("Warning: Failed to get frame from buffer, frame is None.")
+            # This warning helps if frames are not being captured correctly.
+            print("Warning: Failed to get a valid frame from buffer.")
 
 
     roi = hailo.get_roi_from_buffer(buffer)
