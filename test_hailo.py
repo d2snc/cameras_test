@@ -9,8 +9,6 @@ from collections import deque
 import threading
 import time
 from datetime import datetime
-import queue
-import gc
 
 from hailo_apps_infra.hailo_rpi_common import (
     get_caps_from_pad,
@@ -72,212 +70,118 @@ if not os.path.exists(SAVE_FOLDER):
     print(f"Created folder: {SAVE_FOLDER}")
 
 # -----------------------------------------------------------------------------------------------
-# Optimized frame buffer using memory-mapped arrays
-# -----------------------------------------------------------------------------------------------
-class OptimizedFrameBuffer:
-    def __init__(self, max_frames, frame_shape):
-        self.max_frames = max_frames
-        self.frame_shape = frame_shape
-        self.current_index = 0
-        self.is_full = False
-        self.lock = threading.Lock()
-        
-        # Pre-allocate memory for all frames
-        self.buffer = np.empty((max_frames, *frame_shape), dtype=np.uint8)
-        self.timestamps = np.empty(max_frames, dtype=np.float64)
-    
-    def add_frame(self, frame):
-        with self.lock:
-            self.buffer[self.current_index] = frame
-            self.timestamps[self.current_index] = time.time()
-            self.current_index = (self.current_index + 1) % self.max_frames
-            if self.current_index == 0:
-                self.is_full = True
-    
-    def get_frames(self, num_frames):
-        with self.lock:
-            if not self.is_full and self.current_index < num_frames:
-                # Not enough frames yet
-                return self.buffer[:self.current_index].copy()
-            
-            if self.is_full:
-                # Buffer is full, get last num_frames
-                if num_frames >= self.max_frames:
-                    # Return entire buffer in correct order
-                    return np.concatenate([
-                        self.buffer[self.current_index:],
-                        self.buffer[:self.current_index]
-                    ])
-                else:
-                    # Get last num_frames
-                    start_idx = (self.current_index - num_frames) % self.max_frames
-                    if start_idx < self.current_index:
-                        return self.buffer[start_idx:self.current_index].copy()
-                    else:
-                        return np.concatenate([
-                            self.buffer[start_idx:],
-                            self.buffer[:self.current_index]
-                        ])
-            else:
-                # Buffer not full yet
-                start_idx = max(0, self.current_index - num_frames)
-                return self.buffer[start_idx:self.current_index].copy()
-    
-    def __len__(self):
-        return self.max_frames if self.is_full else self.current_index
-
-# -----------------------------------------------------------------------------------------------
-# Video writer with queue for non-blocking saves
-# -----------------------------------------------------------------------------------------------
-class AsyncVideoWriter:
-    def __init__(self):
-        self.save_queue = queue.Queue(maxsize=2)
-        self.worker_thread = threading.Thread(target=self._worker, daemon=True)
-        self.worker_thread.start()
-        self.is_saving = False
-    
-    def _worker(self):
-        while True:
-            try:
-                task = self.save_queue.get(timeout=1)
-                if task is None:  # Shutdown signal
-                    break
-                
-                frames, filename, fps, shape = task
-                self._save_video(frames, filename, fps, shape)
-                self.save_queue.task_done()
-                
-            except queue.Empty:
-                continue
-    
-    def _save_video(self, frames, filename, fps, shape):
-        self.is_saving = True
-        try:
-            # Use more efficient codec
-            fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-            out = cv2.VideoWriter(filename, fourcc, fps, (shape[1], shape[0]))
-            
-            if not out.isOpened():
-                print(f"Error: Could not initialize VideoWriter for {filename}")
-                return
-            
-            # Write frames in chunks to improve performance
-            chunk_size = 30  # Process 30 frames at a time
-            total_frames = len(frames)
-            
-            for i in range(0, total_frames, chunk_size):
-                chunk_end = min(i + chunk_size, total_frames)
-                for j in range(i, chunk_end):
-                    out.write(frames[j])
-                
-                # Progress update
-                progress = (chunk_end / total_frames) * 100
-                print(f"Saving progress: {progress:.1f}%", end='\r')
-            
-            out.release()
-            print(f"\nVideo saved: {filename} ({total_frames} frames)")
-            
-            # Force garbage collection after saving
-            del frames
-            gc.collect()
-            
-        except Exception as e:
-            print(f"Error saving video: {e}")
-        finally:
-            self.is_saving = False
-    
-    def save_video_async(self, frames, filename, fps, shape):
-        try:
-            self.save_queue.put_nowait((frames, filename, fps, shape))
-            return True
-        except queue.Full:
-            print("Save queue is full, skipping this save")
-            return False
-    
-    def is_busy(self):
-        return self.is_saving or not self.save_queue.empty()
-
-# -----------------------------------------------------------------------------------------------
 # User-defined class to be used in the callback function
 # -----------------------------------------------------------------------------------------------
 class user_app_callback_class(app_callback_class):
     def __init__(self):
         super().__init__()
+        self.frame_buffer = deque(maxlen=1050)  # 35 seconds at 30fps (30 before + 5 after)
         self.arms_crossed_detected = False
         self.last_arms_crossed_time = None
+        self.saving_video = False
+        self.frame_dimensions = None
         self.fps = 30  # Assumed FPS, adjust as needed
         self.cooldown_period = 5  # Seconds before allowing another video save
         self.status_text = "Arms Not Crossed"
+        self.lock = threading.Lock()
         self.capture_trigger_time = None
         self.capture_extra_frames = 150  # 5 seconds of extra frames after trigger
         self.frames_after_trigger = 0
         self.triggered = False
         self.total_detections = 0  # Counter for total arms crossed detections
-        
-        # Initialize optimized frame buffer (will be set after first frame)
-        self.frame_buffer = None
-        self.buffer_seconds = 35  # 30 seconds before + 5 seconds after
-        
-        # Async video writer
-        self.video_writer = AsyncVideoWriter()
-        
-        # Performance monitoring
-        self.last_fps_update = time.time()
-        self.frame_count_fps = 0
-        self.current_fps = 30
-
-    def init_buffer(self, frame_shape):
-        """Initialize buffer with known frame shape"""
-        if self.frame_buffer is None:
-            max_frames = self.buffer_seconds * self.fps
-            self.frame_buffer = OptimizedFrameBuffer(max_frames, frame_shape)
-            print(f"Initialized optimized buffer for {max_frames} frames")
+        self.save_in_progress = False  # Flag to prevent multiple saves
 
     def add_frame_to_buffer(self, frame):
-        """Add frame to optimized buffer"""
-        if self.frame_buffer is not None:
-            self.frame_buffer.add_frame(frame)
+        """Add frame to circular buffer"""
+        # Don't add frames if we're saving to avoid memory issues
+        if not self.save_in_progress:
+            with self.lock:
+                self.frame_buffer.append(frame.copy())
 
     def save_buffer_to_video(self):
         """Save the frame buffer to a video file in the gravacoes folder"""
-        if self.video_writer.is_busy():
-            print("Video writer is busy, skipping save")
+        if self.saving_video or self.save_in_progress:
+            print("Already saving a video, skipping...")
             return
         
-        if self.frame_buffer is None or len(self.frame_buffer) == 0:
-            print("No frames in buffer to save")
-            return
+        self.save_in_progress = True
         
-        # Calculate how many frames to save
-        total_frames_to_save = min(900 + self.frames_after_trigger, len(self.frame_buffer))
-        frames_to_save = self.frame_buffer.get_frames(total_frames_to_save)
-        
-        if len(frames_to_save) == 0:
-            print("No frames retrieved from buffer")
-            return
-        
-        # Create video filename with timestamp
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = os.path.join(SAVE_FOLDER, f"arms_crossed_{timestamp}.mp4")
-        
-        # Get frame dimensions
-        h, w = frames_to_save[0].shape[:2]
-        
-        # Save video asynchronously
-        if self.video_writer.save_video_async(frames_to_save, filename, self.fps, (h, w)):
-            print(f"Video save queued: {filename}")
-        
-        self.triggered = False
-        self.frames_after_trigger = 0
+        try:
+            # Copy frames we need before starting the save
+            with self.lock:
+                if len(self.frame_buffer) == 0:
+                    print("No frames in buffer to save")
+                    self.save_in_progress = False
+                    return
+                
+                # Calculate how many frames to save
+                total_frames_to_save = min(900 + self.frames_after_trigger, len(self.frame_buffer))
+                # Get only the frames we need
+                frames_to_save = list(self.frame_buffer)[-total_frames_to_save:]
+                print(f"Copying {len(frames_to_save)} frames for saving...")
+            
+            # Create video filename with timestamp
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = os.path.join(SAVE_FOLDER, f"arms_crossed_{timestamp}.mp4")
+            
+            # Start saving in a separate thread
+            save_thread = threading.Thread(
+                target=self._do_save_video,
+                args=(frames_to_save, filename),
+                daemon=True
+            )
+            save_thread.start()
+            
+        except Exception as e:
+            print(f"Error preparing video save: {e}")
+            self.save_in_progress = False
 
-    def update_fps(self):
-        """Update FPS calculation"""
-        self.frame_count_fps += 1
-        current_time = time.time()
-        if current_time - self.last_fps_update >= 1.0:
-            self.current_fps = self.frame_count_fps / (current_time - self.last_fps_update)
-            self.frame_count_fps = 0
-            self.last_fps_update = current_time
+    def _do_save_video(self, frames, filename):
+        """Actually save the video (runs in separate thread)"""
+        self.saving_video = True
+        
+        try:
+            if len(frames) == 0:
+                print("No frames to save")
+                return
+            
+            # Get frame dimensions
+            h, w = frames[0].shape[:2]
+            
+            # Use XVID codec which is more compatible and faster
+            fourcc = cv2.VideoWriter_fourcc(*'XVID')
+            out = cv2.VideoWriter(filename.replace('.mp4', '.avi'), fourcc, self.fps, (w, h))
+            
+            if not out.isOpened():
+                print(f"Error: Could not initialize VideoWriter for {filename}")
+                return
+            
+            print(f"Saving {len(frames)} frames to {filename}...")
+            
+            # Write frames with progress updates
+            for i, frame in enumerate(frames):
+                if frame is not None:
+                    out.write(frame)
+                    
+                # Progress update every 30 frames
+                if i % 30 == 0:
+                    progress = (i / len(frames)) * 100
+                    print(f"Saving progress: {progress:.1f}%")
+            
+            out.release()
+            print(f"Video saved successfully: {filename}")
+            print(f"Video duration: {len(frames)/self.fps:.1f} seconds")
+            
+            # Clear some memory
+            frames = None
+            
+        except Exception as e:
+            print(f"Error saving video: {e}")
+        finally:
+            self.saving_video = False
+            self.save_in_progress = False
+            self.triggered = False
+            self.frames_after_trigger = 0
 
 # -----------------------------------------------------------------------------------------------
 # Utility functions
@@ -340,7 +244,6 @@ def check_arms_crossed_above_head(points, bbox, width, height, keypoints):
         return wrists_above_head and wrists_crossed
         
     except Exception as e:
-        print(f"Error checking arms crossed: {e}")
         return False
 
 # -----------------------------------------------------------------------------------------------
@@ -355,10 +258,7 @@ def app_callback(pad, info, user_data):
 
     # Using the user_data to count the number of frames
     user_data.increment()
-    
-    # Update FPS
-    user_data.update_fps()
-    
+
     # Get the caps from the pad
     format, width, height = get_caps_from_pad(pad)
 
@@ -369,9 +269,19 @@ def app_callback(pad, info, user_data):
         user_data.use_frame = True
         frame = get_numpy_from_buffer(buffer, format, width, height)
         
-        # Initialize buffer if needed
-        if user_data.frame_buffer is None:
-            user_data.init_buffer(frame.shape)
+        # Store frame dimensions
+        if user_data.frame_dimensions is None:
+            user_data.frame_dimensions = (height, width)
+
+    # Skip detection if we're saving video to reduce CPU load
+    if user_data.save_in_progress:
+        if frame is not None:
+            # Just show basic info while saving
+            frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+            cv2.putText(frame, "SAVING VIDEO - PLEASE WAIT...", (50, frame.shape[0]//2), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 0, 255), 3, cv2.LINE_AA)
+            user_data.set_frame(frame)
+        return Gst.PadProbeReturn.OK
 
     # Get the detections from the buffer
     roi = hailo.get_roi_from_buffer(buffer)
@@ -405,9 +315,9 @@ def app_callback(pad, info, user_data):
                 if check_arms_crossed_above_head(points, bbox, width, height, keypoints):
                     arms_crossed_in_frame = True
                 
-                # Draw keypoints only if visualization is needed
-                if frame is not None and user_data.get_count() % 3 == 0:  # Reduce drawing frequency
-                    # Draw only key keypoints for performance
+                # Draw keypoints
+                if frame is not None:
+                    # Draw key keypoints
                     key_points = ['left_wrist', 'right_wrist', 'nose']
                     for keypoint_name in key_points:
                         keypoint_index = keypoints[keypoint_name]
@@ -431,7 +341,7 @@ def app_callback(pad, info, user_data):
         user_data.status_text = "Arms Crossed Above Head!"
         
         # Check if we should trigger video capture
-        if not user_data.arms_crossed_detected and not user_data.triggered:
+        if not user_data.arms_crossed_detected and not user_data.triggered and not user_data.save_in_progress:
             user_data.arms_crossed_detected = True
             
             # Check cooldown period
@@ -442,7 +352,7 @@ def app_callback(pad, info, user_data):
                 user_data.triggered = True
                 user_data.frames_after_trigger = 0
                 user_data.total_detections += 1
-                print("Arms crossed detected! Capturing additional frames...")
+                print("\n*** Arms crossed detected! Capturing additional frames... ***")
                 
                 # Activate LED when arms are crossed
                 pulse_led(3.0)
@@ -451,50 +361,58 @@ def app_callback(pad, info, user_data):
         user_data.arms_crossed_detected = False
     
     # If we've triggered capture, continue capturing for a few more seconds
-    if user_data.triggered:
+    if user_data.triggered and not user_data.save_in_progress:
         user_data.frames_after_trigger += 1
         
         # Check if we've captured enough frames after the trigger
         if user_data.frames_after_trigger >= user_data.capture_extra_frames:
             user_data.last_arms_crossed_time = current_time
-            # Save video in a separate thread
-            threading.Thread(target=user_data.save_buffer_to_video).start()
-            print(f"Saving video with {user_data.frames_after_trigger} frames after trigger")
+            print(f"\n*** Starting video save with {user_data.frames_after_trigger} frames after trigger ***")
+            user_data.save_buffer_to_video()
 
     if frame is not None:
         # Convert the frame to BGR
         frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
         
-        # Add status text to frame (simplified for performance)
+        # Add status text to frame
         font = cv2.FONT_HERSHEY_SIMPLEX
+        font_scale = 1
+        thickness = 2
         
         # Main status
         color = (0, 0, 255) if "Crossed" in user_data.status_text and "Not" not in user_data.status_text else (0, 255, 0)
         cv2.putText(frame, user_data.status_text, (10, 40), 
-                   font, 1, color, 2, cv2.LINE_AA)
+                   font, font_scale, color, thickness, cv2.LINE_AA)
         
-        # Performance stats
-        perf_text = f"FPS: {user_data.current_fps:.1f} | Buffer: {len(user_data.frame_buffer) if user_data.frame_buffer else 0}"
-        cv2.putText(frame, perf_text, (10, 70), 
+        # Buffer status
+        buffer_text = f"Buffer: {len(user_data.frame_buffer)}/{user_data.frame_buffer.maxlen} frames"
+        cv2.putText(frame, buffer_text, (10, 70), 
                    font, 0.6, (255, 255, 255), 1, cv2.LINE_AA)
         
         # Capture status if triggered
         if user_data.triggered:
-            capture_text = f"Capturing: {user_data.frames_after_trigger}/{user_data.capture_extra_frames}"
+            capture_text = f"Capturing: {user_data.frames_after_trigger}/{user_data.capture_extra_frames} frames"
             cv2.putText(frame, capture_text, (10, 100), 
                        font, 0.6, (255, 255, 0), 1, cv2.LINE_AA)
         
-        # Save status
-        if user_data.video_writer.is_busy():
-            cv2.putText(frame, "SAVING VIDEO...", (frame.shape[1]//2 - 100, 40), 
-                       font, 1, (0, 0, 255), 2, cv2.LINE_AA)
-        
         # Detection counter
-        cv2.putText(frame, f"Detections: {user_data.total_detections}", (10, 130), 
+        counter_text = f"Total Detections: {user_data.total_detections}"
+        cv2.putText(frame, counter_text, (10, 130), 
                    font, 0.6, (255, 255, 0), 1, cv2.LINE_AA)
         
-        # Add frame to buffer
-        user_data.add_frame_to_buffer(frame)
+        # Save status
+        if user_data.saving_video:
+            cv2.putText(frame, "SAVING VIDEO...", (frame.shape[1]//2 - 150, 80), 
+                       font, 1.2, (0, 0, 255), 3, cv2.LINE_AA)
+        
+        # Save folder info
+        folder_text = f"Save folder: {SAVE_FOLDER}"
+        cv2.putText(frame, folder_text, (10, frame.shape[0] - 20), 
+                   font, 0.5, (200, 200, 200), 1, cv2.LINE_AA)
+        
+        # Add frame to buffer (only if not saving)
+        if not user_data.save_in_progress:
+            user_data.add_frame_to_buffer(frame)
         
         # Set frame for display
         user_data.set_frame(frame)
@@ -533,4 +451,3 @@ if __name__ == "__main__":
         print("\nShutting down...")
     finally:
         cleanup_gpio()
-        gc.collect()
