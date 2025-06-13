@@ -23,7 +23,7 @@ from hailo_apps_infra.pose_estimation_pipeline import GStreamerPoseEstimationApp
 class user_app_callback_class(app_callback_class):
     def __init__(self):
         super().__init__()
-        self.frame_buffer = deque(maxlen=900)  # 30 seconds at 30fps
+        self.frame_buffer = deque(maxlen=1050)  # 35 seconds at 30fps (30 before + 5 after)
         self.arms_crossed_detected = False
         self.last_arms_crossed_time = None
         self.saving_video = False
@@ -33,6 +33,10 @@ class user_app_callback_class(app_callback_class):
         self.cooldown_period = 5  # Seconds before allowing another video save
         self.status_text = "Arms Not Crossed"
         self.lock = threading.Lock()
+        self.capture_trigger_time = None
+        self.capture_extra_frames = 150  # 5 seconds of extra frames after trigger
+        self.frames_after_trigger = 0
+        self.triggered = False
 
     def add_frame_to_buffer(self, frame):
         """Add frame to circular buffer"""
@@ -50,7 +54,10 @@ class user_app_callback_class(app_callback_class):
                 return
             
             self.saving_video = True
-            frames_to_save = list(self.frame_buffer)
+            # Calculate how many frames to save (30 seconds before + moment of crossing)
+            # We want the last 900 frames (30 seconds) plus the frames captured after trigger
+            total_frames_to_save = min(900 + self.frames_after_trigger, len(self.frame_buffer))
+            frames_to_save = list(self.frame_buffer)[-total_frames_to_save:]
         
         # Create video filename with timestamp
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -70,8 +77,11 @@ class user_app_callback_class(app_callback_class):
             
             out.release()
             print(f"Video saved: {filename} ({len(frames_to_save)} frames)")
+            print(f"Video duration: {len(frames_to_save)/self.fps:.1f} seconds")
         
         self.saving_video = False
+        self.triggered = False
+        self.frames_after_trigger = 0
 
 # -----------------------------------------------------------------------------------------------
 # Utility functions
@@ -223,20 +233,32 @@ def app_callback(pad, info, user_data):
     if arms_crossed_in_frame:
         user_data.status_text = "Arms Crossed Above Head!"
         
-        # Check if we should save video
-        if not user_data.arms_crossed_detected:
+        # Check if we should trigger video capture
+        if not user_data.arms_crossed_detected and not user_data.triggered:
             user_data.arms_crossed_detected = True
             
             # Check cooldown period
             if (user_data.last_arms_crossed_time is None or 
                 current_time - user_data.last_arms_crossed_time > user_data.cooldown_period):
                 
-                user_data.last_arms_crossed_time = current_time
-                # Save video in a separate thread to avoid blocking
-                threading.Thread(target=user_data.save_buffer_to_video).start()
+                user_data.capture_trigger_time = current_time
+                user_data.triggered = True
+                user_data.frames_after_trigger = 0
+                print("Arms crossed detected! Capturing additional frames...")
     else:
         user_data.status_text = "Arms Not Crossed"
         user_data.arms_crossed_detected = False
+    
+    # If we've triggered capture, continue capturing for a few more seconds
+    if user_data.triggered:
+        user_data.frames_after_trigger += 1
+        
+        # Check if we've captured enough frames after the trigger
+        if user_data.frames_after_trigger >= user_data.capture_extra_frames:
+            user_data.last_arms_crossed_time = current_time
+            # Save video in a separate thread
+            threading.Thread(target=user_data.save_buffer_to_video).start()
+            print(f"Saving video with {user_data.frames_after_trigger} frames after trigger")
 
     if frame is not None:
         # Convert the frame to BGR
@@ -267,6 +289,12 @@ def app_callback(pad, info, user_data):
         buffer_text = f"Buffer: {len(user_data.frame_buffer)}/{user_data.frame_buffer.maxlen} frames"
         cv2.putText(frame, buffer_text, (text_x, text_y + 40), 
                    font, 0.6, (255, 255, 255), 1, cv2.LINE_AA)
+        
+        # Add capture status if triggered
+        if user_data.triggered:
+            capture_text = f"Capturing: {user_data.frames_after_trigger}/{user_data.capture_extra_frames} frames"
+            cv2.putText(frame, capture_text, (text_x, text_y + 70), 
+                       font, 0.6, (255, 255, 0), 1, cv2.LINE_AA)
         
         # Add frame to buffer
         user_data.add_frame_to_buffer(frame)
