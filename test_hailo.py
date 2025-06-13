@@ -230,11 +230,11 @@ if __name__ == "__main__":
     # The user_data object now manages state for buffering, recording, and pose detection
     user_data = user_app_callback_class()
     
+    # Enable frame grabbing for visualization and saving by setting the attribute on user_data
+    user_data.use_frame = True
+    
     # Create and run the GStreamer application
     app = GStreamerPoseEstimationApp(app_callback, user_data)
-    
-    # Enable frame grabbing for visualization and saving
-    app.set_use_frame(True) 
     
     app.run()
 
