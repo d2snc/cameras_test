@@ -182,27 +182,13 @@ def app_callback(pad, info, user_data):
 
     frame = None
     if user_data.use_frame:
-        # --- DEFINITIVE FIX: Manually map the GStreamer buffer ---
-        # This replaces the unreliable get_numpy_from_buffer() function.
-        success, map_info = buffer.map(Gst.MapFlags.READ)
-        if success:
-            # Create a numpy array from the mapped buffer data
-            numpy_frame = np.ndarray(
-                (height, width, 3), # Shape for RGB
-                buffer=map_info.data,
-                dtype=np.uint8)
-            
-            # Make a copy of the frame to release the buffer map
-            frame = numpy_frame.copy()
-            
-            # Add the copied frame to our application's buffer
+        # --- DIAGNOSTIC STEP ---
+        # Let's see exactly what we are passing to the library function.
+        print(f"DEBUG: Calling get_numpy_from_buffer with format='{format}', w={width}, h={height}")
+        frame = get_numpy_from_buffer(buffer, format, width, height)
+        if frame is not None:
             user_data.frame_buffer.append(frame)
-            
-            # Unmap the GStreamer buffer to release its resources
-            buffer.unmap(map_info)
-        else:
-            print("Warning: Failed to map GStreamer buffer.")
-        # --- END FIX ---
+        # --- END DIAGNOSTIC ---
 
 
     roi = hailo.get_roi_from_buffer(buffer)
