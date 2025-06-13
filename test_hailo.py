@@ -58,7 +58,6 @@ class user_app_callback_class(app_callback_class):
         self.frame_buffer = deque()
         self.is_recording = False
         self.pose_start_time = None
-        self._last_led_pulse_time = 0
         self.pose_triggered_this_cycle = False # Flag to prevent re-triggering
         
         # --- FPS Calculation Attributes ---
@@ -69,17 +68,14 @@ class user_app_callback_class(app_callback_class):
 
     def get_fps(self):
         """Calculates and returns the current FPS."""
-        # We use the total frame count from the base class `app_callback_class` via self.get_count()
         total_frames = self.get_count()
         current_time = time.time()
         elapsed_time = current_time - self._fps_last_time
         
-        # Update FPS calculation at least every second for stability
         if elapsed_time >= 1.0:
             frames_since_last = total_frames - self._fps_last_frame_count
             self._fps = frames_since_last / elapsed_time
             
-            # Reset for the next calculation interval
             self._fps_last_time = current_time
             self._fps_last_frame_count = total_frames
             
@@ -90,7 +86,6 @@ class user_app_callback_class(app_callback_class):
         if fps > 0:
             max_len = int(fps * BUFFER_SECONDS)
             if self.frame_buffer.maxlen != max_len:
-                # Recreate the deque with the new maxlen while preserving content
                 current_frames = list(self.frame_buffer)
                 self.frame_buffer = deque(current_frames, maxlen=max_len)
                 print(f"Frame buffer resized to {max_len} frames for {fps:.1f} FPS.")
@@ -99,14 +94,8 @@ class user_app_callback_class(app_callback_class):
         """Turns the LED on for a specified duration."""
         if not LED_AVAILABLE:
             return
-        now = time.time()
-        # Prevent rapid re-triggering
-        if now - self._last_led_pulse_time < duration + 1.0:
-            return
-        self._last_led_pulse_time = now
         print(f"Turning LED ON for {duration} seconds.")
         led_line.set_value(1)
-        # Schedule the LED to turn off
         t = threading.Timer(duration, lambda: led_line.set_value(0))
         t.daemon = True
         t.start()
@@ -118,38 +107,39 @@ class user_app_callback_class(app_callback_class):
         self.is_recording = True
 
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = os.path.join(RECORDING_FOLDER, f"{FILE_PREFIX}{timestamp}.mp4")
+        filename = os.path.join(RECORDING_FOLDER, f"{FILE_PREFIX}{timestamp}.avi")
         
-        # Make a copy to prevent issues with the buffer changing during saving
         frames_to_save = list(self.frame_buffer)
 
         print(f"Starting video save to {filename} with {len(frames_to_save)} frames.")
+        print(f"Attempting to save video with dimensions {width}x{height} at {fps:.2f} FPS.")
         
-        # Run saving in a separate thread to not block the pipeline
         thread = threading.Thread(target=self._write_video_file, args=(filename, frames_to_save, width, height, fps))
         thread.daemon = True
         thread.start()
 
     def _write_video_file(self, filename, frames, width, height, fps):
         """The actual video writing logic."""
-        # Use MP4V codec for better compatibility
-        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-        # Use a reasonable FPS, capping at 30
-        save_fps = min(fps if fps > 0 else 30, 30)
-        writer = cv2.VideoWriter(filename, fourcc, save_fps, (width, height))
-        
-        if not writer.isOpened():
-            print(f"Error: Could not open video writer for {filename}")
-            self.is_recording = False
-            return
+        try:
+            # Use XVID codec for better compatibility (.avi)
+            fourcc = cv2.VideoWriter_fourcc(*'XVID')
+            save_fps = min(fps if fps > 0 else 30, 30)
+            writer = cv2.VideoWriter(filename, fourcc, save_fps, (width, height))
+            
+            if not writer.isOpened():
+                print(f"Error: Could not open video writer for {filename}")
+                self.is_recording = False
+                return
 
-        for frame in frames:
-            # Ensure the frame is in BGR format for OpenCV
-            writer.write(cv2.cvtColor(frame, cv2.COLOR_RGB2BGR))
-        
-        writer.release()
-        print(f"Successfully saved video: {filename}")
-        self.is_recording = False
+            for frame in frames:
+                writer.write(cv2.cvtColor(frame, cv2.COLOR_RGB2BGR))
+            
+            writer.release()
+            print(f"Successfully saved video: {filename}")
+        except Exception as e:
+            print(f"!!! FATAL ERROR during video writing: {e}")
+        finally:
+            self.is_recording = False
 
 
 # -----------------------------------------------------------------------------------------------
@@ -162,20 +152,16 @@ def app_callback(pad, info, user_data):
 
     user_data.increment()
     
-    # Get frame properties
     format, width, height = get_caps_from_pad(pad)
-    fps = user_data.get_fps() # This now calls the method implemented in our class
+    fps = user_data.get_fps()
     
-    # Dynamically update buffer size based on measured FPS
     user_data.update_buffer_size(fps)
 
     frame = None
     if user_data.use_frame and all((format, width, height)):
         frame = get_numpy_from_buffer(buffer, format, width, height)
-        # Add frame to buffer
         user_data.frame_buffer.append(frame.copy())
 
-    # Get detections
     roi = hailo.get_roi_from_buffer(buffer)
     detections = roi.get_objects_typed(hailo.HAILO_DETECTION)
     
@@ -193,54 +179,45 @@ def app_callback(pad, info, user_data):
             for name, index in keypoints_map.items():
                 point = points[index]
                 if point.confidence() > POSE_CONFIDENCE_THRESHOLD:
-                    # Scale points to frame dimensions
                     bbox = detection.get_bbox()
                     kpts[name] = (
                         int((point.x() * bbox.width() + bbox.xmin()) * width),
                         int((point.y() * bbox.height() + bbox.ymin()) * height)
                     )
 
-            # Check for the "arms crossed above head" pose
             required_kpts = ['left_wrist', 'right_wrist', 'left_shoulder', 'right_shoulder', 'nose']
             if all(kpt in kpts for kpt in required_kpts):
                 lw, rw = kpts['left_wrist'], kpts['right_wrist']
                 ls, rs = kpts['left_shoulder'], kpts['right_shoulder']
                 ns = kpts['nose']
 
-                # Condition 1: Wrists are crossed horizontally (left wrist is to the right of the right shoulder)
                 wrists_crossed = lw[0] > rs[0] and rw[0] < ls[0]
-                # Condition 2: Both wrists are above the nose
                 arms_above_head = lw[1] < ns[1] and rw[1] < ns[1]
 
                 if wrists_crossed and arms_above_head:
                     arms_crossed_detected = True
-                    break # A person is in the pose, no need to check others
+                    break
 
-    # State machine for pose detection and triggering actions
     if arms_crossed_detected:
         if user_data.pose_start_time is None:
             user_data.pose_start_time = time.time()
-        # Check if pose is held and has not been triggered in this cycle
         elif time.time() - user_data.pose_start_time >= POSE_DURATION_SECONDS and not user_data.pose_triggered_this_cycle:
             if not user_data.is_recording and width > 0 and height > 0:
                 print("Arms crossed pose held. Triggering actions.")
                 user_data.pulse_led()
                 user_data.save_video_from_buffer(width, height, fps)
-                # Set flag to prevent re-triggering until pose is broken
                 user_data.pose_triggered_this_cycle = True
             elif user_data.is_recording:
                 print("Info: Pose detected, but a recording is already in progress.")
             else:
-                print("Error: Pose detected, but video dimensions are invalid. Cannot save.")
+                print(f"Error: Pose detected, but video dimensions are invalid ({width}x{height}). Cannot save.")
                 
     else:
-        # If pose is no longer detected, reset the timer and the trigger flag
         if user_data.pose_start_time is not None:
             print("Pose broken.")
             user_data.pose_start_time = None
-            user_data.pose_triggered_this_cycle = False # Re-arm trigger for the next time
+            user_data.pose_triggered_this_cycle = False
             
-    # Optional: Draw keypoints on the frame for visualization
     if frame is not None and user_data.use_frame:
         if arms_crossed_detected:
              cv2.putText(frame, "ARMS CROSSED!", (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
@@ -259,18 +236,13 @@ def get_keypoints():
     }
 
 if __name__ == "__main__":
-    # The user_data object now manages state for buffering, recording, and pose detection
     user_data = user_app_callback_class()
-    
-    # Enable frame grabbing for visualization and saving by setting the attribute on user_data
     user_data.use_frame = True
     
-    # Create and run the GStreamer application
     app = GStreamerPoseEstimationApp(app_callback, user_data)
     
     app.run()
 
-    # Cleanup GPIO on exit
     if LED_AVAILABLE:
         led_line.set_value(0)
         led_line.release()
