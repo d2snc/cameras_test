@@ -1,20 +1,21 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Pose estimation + arms-crossed detector with non-blocking
-hardware-accelerated video recorder for Raspberry Pi.
-2025-06-13  rev.3
+Pose estimation + arms-crossed detector, Raspberry Pi
+2025-06-13  rev.5   (30-second clip limit)
 """
+
 import gi
-gi.require_version("Gst", "1.0")
+gi.require_version('Gst', '1.0')
 from gi.repository import Gst, GLib
+
 import cv2, numpy as np, hailo, os, time, threading, multiprocessing as mp
+import subprocess, shlex, signal
 from collections import deque
 from datetime import datetime
-import subprocess, shlex, signal
 
 # ---------------------------------------------------------------------------------
-#  GPIO  --------------------------------------------------------------------------
+# GPIO (BCM-17 LED) ----------------------------------------------------------------
 # ---------------------------------------------------------------------------------
 try:
     import gpiod
@@ -27,243 +28,180 @@ except Exception as e:
     LED_OK = False
 
 def pulse_led(duration=3.0):
-    """Turn LED on, schedule auto-off after *duration* seconds."""
-    if not LED_OK:
-        return
+    if not LED_OK: return
     _led.set_value(1)
     t = threading.Timer(duration, lambda: _led.set_value(0))
-    t.daemon = True        # works on every Python version
+    t.daemon = True
     t.start()
 
 # ---------------------------------------------------------------------------------
-#  Asynchronous saver -------------------------------------------------------------
+# Saver process (unchanged) --------------------------------------------------------
 # ---------------------------------------------------------------------------------
 def saver_proc(frame_q: mp.Queue, stop_q: mp.Queue, w, h, fps):
-    """
-    Receives JPEG bytes on frame_q, writes an MP4.
-    Switches from HW GStreamer to SW OpenCV automatically if HW pipeline fails.
-    Terminates when stop_q gets any message.
-    """
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     mp4_path = os.path.join("gravacoes", f"arms_crossed_{ts}.mp4")
     print(f"[Saver] Starting file {mp4_path}")
 
-    def start_hw_pipeline():
+    def start_hw():
         gst_cmd = (
-            f"gst-launch-1.0 -q appsrc name=appsrc is-live=true block=true "
-            f"format=3 do-timestamp=true ! jpegdec ! "
-            f"videoconvert ! video/x-raw,format=I420,width={w},height={h},"
-            f"framerate={fps}/1 ! "
-            f"v4l2h264enc extra-controls=\"encode,frame_level_rate_control_enable=true\" "
-            f"keyframe-period={fps*2} ! h264parse ! mp4mux name=mux ! "
-            f"filesink location={mp4_path}"
+            f"gst-launch-1.0 -q appsrc name=appsrc is-live=true block=true format=3 do-timestamp=true ! "
+            f"jpegdec ! videoconvert ! video/x-raw,format=I420,width={w},height={h},framerate={fps}/1 ! "
+            f"v4l2h264enc extra-controls=\"encode,frame_level_rate_control_enable=true\" keyframe-period={fps*2} ! "
+            f"h264parse ! mp4mux ! filesink location={mp4_path}"
         )
         try:
-            return subprocess.Popen(
-                shlex.split(gst_cmd), stdin=subprocess.PIPE,
-                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                preexec_fn=os.setsid  # so we can kill the whole group later
-            )
+            return subprocess.Popen(shlex.split(gst_cmd), stdin=subprocess.PIPE,
+                                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                                    preexec_fn=os.setsid)
         except FileNotFoundError:
             return None
 
-    # try hardware encoding first
-    proc = start_hw_pipeline()
+    proc = start_hw()
     use_gst = proc is not None
     if not use_gst:
-        print("[Saver] HW encoder unavailable → OpenCV software fallback.")
+        print("[Saver] HW encoder unavailable → OpenCV fallback.")
         fourcc = cv2.VideoWriter_fourcc(*"mp4v")
         vw = cv2.VideoWriter(mp4_path, fourcc, fps, (w, h))
 
     frames = 0
-    alive = True
-    while alive:
-        # ------------------ handle stop request -----------------
+    while True:
         if not stop_q.empty():
-            frame_q.put(None)       # poison pill once queue drains
-        # ------------------ get frame --------------------------
+            frame_q.put(None)
         try:
             jpeg_bytes = frame_q.get(timeout=0.05)
         except Exception:
             jpeg_bytes = None
-
-        if jpeg_bytes is None:      # poison pill received
+        if jpeg_bytes is None:
             break
 
-        # ------------------ write frame ------------------------
         if use_gst:
-            try:
-                proc.stdin.write(jpeg_bytes)
+            try: proc.stdin.write(jpeg_bytes)
             except (BrokenPipeError, OSError):
-                print("[Saver] HW pipeline died → switching to OpenCV fallback.")
-                # close HW pipeline gracefully
-                try:
-                    os.killpg(proc.pid, signal.SIGINT)
-                except Exception:
-                    pass
+                print("[Saver] HW pipeline died → OpenCV fallback.")
+                try: os.killpg(proc.pid, signal.SIGINT)
+                except Exception: pass
                 use_gst = False
                 fourcc = cv2.VideoWriter_fourcc(*"mp4v")
                 vw = cv2.VideoWriter(mp4_path, fourcc, fps, (w, h))
-                # fall through to OpenCV branch for this frame
         if not use_gst:
-            np_buf = np.frombuffer(jpeg_bytes, dtype=np.uint8)
-            frame  = cv2.imdecode(np_buf, cv2.IMREAD_COLOR)
+            frame = cv2.imdecode(np.frombuffer(jpeg_bytes, np.uint8), cv2.IMREAD_COLOR)
             vw.write(frame)
         frames += 1
 
-    # ------------------ cleanup -------------------------------
     if use_gst:
-        try:
-            proc.stdin.close()
-            proc.wait(timeout=5)
-        except Exception:
-            pass
+        proc.stdin.close(); proc.wait(timeout=5)
     else:
         vw.release()
     print(f"[Saver] Saved {frames} frames → {mp4_path}")
 
 # ---------------------------------------------------------------------------------
-#  Pose detection callback class ---------------------------------------------------
+# Hailo helpers --------------------------------------------------------------------
 # ---------------------------------------------------------------------------------
 from hailo_apps_infra.hailo_rpi_common import (
     get_caps_from_pad, get_numpy_from_buffer, app_callback_class
 )
 from hailo_apps_infra.pose_estimation_pipeline import GStreamerPoseEstimationApp
 
-class UserCB(app_callback_class):
-    FPS               = 30
-    BUFFER            = 1200             # ~40 s @ 30 fps
-    AFTER_TRIGGER     = FPS * 5          # 5 s extra
-    COOLDOWN_S        = 5
-
-    def __init__(self):
-        super().__init__()
-        self.buf = deque(maxlen=self.BUFFER)
-        self.last_event  = 0.0
-        self.triggered   = False
-        self.after_count = 0
-        self.saver: mp.Process|None = None
-        self.frame_q, self.stop_q = None, None
-        self.status = "Arms Not Crossed"
-        self.tot    = 0
-        self.dim    = None
-
-    # -------------- helpers --------------
-    def _launch_saver(self, h, w):
-        self.frame_q = mp.Queue(maxsize=500)
-        self.stop_q  = mp.Queue()
-        self.saver   = mp.Process(
-            target=saver_proc,
-            args=(self.frame_q, self.stop_q, w, h, self.FPS),
-            daemon=True
-        )
-        self.saver.start()
-
-    def _feed_to_saver(self, frame):
-        ok, jpg = cv2.imencode(".jpg", frame, [int(cv2.IMWRITE_JPEG_QUALITY), 85])
-        if ok and self.saver is not None and self.saver.is_alive():
-            try:
-                self.frame_q.put_nowait(jpg.tobytes())
-            except mp.queues.Full:
-                pass  # throttled
-
-# ---------------------------------------------------------------------------------
-#  Helper: detect “arms crossed” ---------------------------------------------------
-# ---------------------------------------------------------------------------------
 KP = {"nose": 0, "left_wrist": 9, "right_wrist": 10}
-
 def crossed(points, bbox, W, H):
     try:
-        lw = points[KP["left_wrist"]]; rw = points[KP["right_wrist"]]; nz = points[KP["nose"]]
-        lwx = (lw.x()*bbox.width()+bbox.xmin())*W
-        lwy = (lw.y()*bbox.height()+bbox.ymin())*H
-        rwx = (rw.x()*bbox.width()+bbox.xmin())*W
-        rwy = (rw.y()*bbox.height()+bbox.ymin())*H
-        nzy = (nz.y()*bbox.height()+bbox.ymin())*H
+        lw, rw, nz = points[9], points[10], points[0]
+        lwx, lwy = (lw.x()*bbox.width()+bbox.xmin())*W, (lw.y()*bbox.height()+bbox.ymin())*H
+        rwx, rwy = (rw.x()*bbox.width()+bbox.xmin())*W, (rw.y()*bbox.height()+bbox.ymin())*H
+        nzy      = (nz.y()*bbox.height()+bbox.ymin())*H
         return (lwy < nzy and rwy < nzy) and (lwx > rwx)
     except Exception:
         return False
 
+def dump_history(buf, feed_fn):
+    for f in buf: feed_fn(f, block=True)
+
 # ---------------------------------------------------------------------------------
-#  Pad probe ----------------------------------------------------------------------
+# User callback --------------------------------------------------------------------
+# ---------------------------------------------------------------------------------
+class UserCB(app_callback_class):
+    FPS               = 30
+    BUFFER            = 600      ### CHANGED → 20 s pre-event (600 /30 fps)
+    AFTER_TRIGGER     = 300      ### CHANGED → 10 s post-event (300 /30 fps)
+    COOLDOWN_S        = 5
+
+    def __init__(self):
+        super().__init__()
+        self.buf, self.dim = deque(maxlen=self.BUFFER), None
+        self.last_event, self.triggered, self.after_count = 0.0, False, 0
+        self.saver, self.frame_q, self.stop_q = None, None, None
+        self.status, self.tot = "Arms Not Crossed", 0
+
+    def _launch_saver(self, h, w):
+        self.frame_q, self.stop_q = mp.Queue(maxsize=800), mp.Queue()
+        self.saver = mp.Process(target=saver_proc,
+                                args=(self.frame_q, self.stop_q, w, h, self.FPS),
+                                daemon=True)
+        self.saver.start()
+
+    def _feed(self, frame, *, block=False):
+        if not (self.saver and self.saver.is_alive()): return
+        ok, jpg = cv2.imencode(".jpg", frame, [int(cv2.IMWRITE_JPEG_QUALITY), 85])
+        if not ok: return
+        try: self.frame_q.put(jpg.tobytes(), block=block, timeout=0.02)
+        except mp.queues.Full: pass
+
 # ---------------------------------------------------------------------------------
 def app_cb(pad, info, user: UserCB):
-    buf = info.get_buffer()
-    fmt, W, H = get_caps_from_pad(pad)
-    if buf is None or fmt is None:
-        return Gst.PadProbeReturn.OK
+    buf = info.get_buffer(); fmt,W,H = get_caps_from_pad(pad)
+    if buf is None or fmt is None: return Gst.PadProbeReturn.OK
     frame = get_numpy_from_buffer(buf, fmt, W, H)
 
-    # ---------- detection --------------------------------------------------------
     roi  = hailo.get_roi_from_buffer(buf)
     dets = roi.get_objects_typed(hailo.HAILO_DETECTION)
-    crossed_now = any(
-        d.get_label() == "person" and
-        d.get_objects_typed(hailo.HAILO_LANDMARKS) and
-        crossed(d.get_objects_typed(hailo.HAILO_LANDMARKS)[0].get_points(),
-                d.get_bbox(), W, H)
-        for d in dets
-    )
+    now_crossed = any(
+        d.get_label()=="person" and d.get_objects_typed(hailo.HAILO_LANDMARKS) and
+        crossed(d.get_objects_typed(hailo.HAILO_LANDMARKS)[0].get_points(), d.get_bbox(), W, H)
+        for d in dets)
 
     t = time.time()
-    if crossed_now:
+    if now_crossed:
         user.status = "Arms Crossed!"
         if not user.triggered and (t - user.last_event) > UserCB.COOLDOWN_S:
-            user.triggered, user.after_count = True, 0
-            user.last_event = t
-            user.tot += 1
-            pulse_led(3)
-            print("*** Arms crossed – capture started ***")
-    else:
-        user.status = "Arms Not Crossed"
+            user.triggered = True; user.after_count = 0
+            user.last_event = t; user.tot += 1
+            pulse_led(3); print("*** Arms crossed – capture started ***")
+    else: user.status = "Arms Not Crossed"
 
     if user.triggered:
         user.after_count += 1
         if user.after_count >= UserCB.AFTER_TRIGGER:
             user.triggered = False
-            if user.stop_q:
-                user.stop_q.put(True)
+            if user.stop_q: user.stop_q.put(True)
+            if LED_OK: _led.set_value(0)
             print("*** Capture finished – writing file ***")
 
-    # ---------- overlay ----------------------------------------------------------
+    # overlay
     bgr = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
-    cv2.putText(
-        bgr, user.status, (10, 40), cv2.FONT_HERSHEY_SIMPLEX, 1,
-        (0, 0, 255) if "Crossed" in user.status else (0, 255, 0), 2
-    )
-    cv2.putText(
-        bgr, f"Detections: {user.tot}", (10, 75),
-        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 1
-    )
+    cv2.putText(bgr, user.status, (10,40), cv2.FONT_HERSHEY_SIMPLEX, 1,
+                (0,0,255) if "Crossed" in user.status else (0,255,0), 2)
+    cv2.putText(bgr, f"Detections: {user.tot}", (10,75),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255,255,0), 1)
 
-    # ---------- buffering + saving ----------------------------------------------
     user.buf.append(bgr)
     if user.triggered and user.after_count == 1:
-        if user.dim is None:
-            user.dim = bgr.shape[:2]
-        h, w = user.dim
-        user._launch_saver(h, w)
-        # send history
-        for f in list(user.buf)[-UserCB.BUFFER:]:
-            user._feed_to_saver(f)
+        if user.dim is None: user.dim = bgr.shape[:2]
+        h,w = user.dim; user._launch_saver(h,w)
+        threading.Thread(target=dump_history,
+                         args=(list(user.buf), user._feed),
+                         daemon=True).start()
     elif user.saver and user.saver.is_alive():
-        user._feed_to_saver(bgr)
+        user._feed(bgr)
 
     user.set_frame(bgr)
     return Gst.PadProbeReturn.OK
 
 # ---------------------------------------------------------------------------------
-#  Main ---------------------------------------------------------------------------
-# ---------------------------------------------------------------------------------
 if __name__ == "__main__":
-    Gst.init(None)
-    os.makedirs("gravacoes", exist_ok=True)
+    Gst.init(None); os.makedirs("gravacoes", exist_ok=True)
     try:
         user = UserCB()
         app  = GStreamerPoseEstimationApp(app_cb, user)
-        print("Running.  Press Ctrl-C to quit.")
-        app.run()
+        print("Running – press Ctrl-C to quit."); app.run()
     finally:
-        # make absolutely sure the LED is off
-        if LED_OK:
-            _led.set_value(0)
+        if LED_OK: _led.set_value(0)
