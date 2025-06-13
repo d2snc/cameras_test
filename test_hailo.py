@@ -34,22 +34,8 @@ os.makedirs(VIDEO_DIR, exist_ok=True)
 def get_keypoints():
     return {
         'nose': 0,
-        'left_eye': 1,
-        'right_eye': 2,
-        'left_ear': 3,
-        'right_ear': 4,
-        'left_shoulder': 5,
-        'right_shoulder': 6,
-        'left_elbow': 7,
-        'right_elbow': 8,
         'left_wrist': 9,
         'right_wrist': 10,
-        'left_hip': 11,
-        'right_hip': 12,
-        'left_knee': 13,
-        'right_knee': 14,
-        'left_ankle': 15,
-        'right_ankle': 16,
     }
 
 # ----------------------------------------------------------------------------
@@ -62,33 +48,16 @@ class user_app_callback_class(app_callback_class):
         self.crossed = False
         self.last_save_time = 0
 
-    def add_frame(self, frame):
-        # Store a copy to avoid mutation
-        self.frame_buffer.append(frame.copy())
-
     def save_buffered_clip(self, width, height):
         timestamp = time.strftime("%Y%m%d_%H%M%S")
         filename = os.path.join(VIDEO_DIR, f"{VIDEO_PREFIX}{timestamp}.mp4")
         fourcc = cv2.VideoWriter_fourcc(*"mp4v")
         writer = cv2.VideoWriter(filename, fourcc, FPS, (width, height))
 
-        total = len(self.frame_buffer)
-        # Annotate and write each frame
-        for idx, frame in enumerate(self.frame_buffer):
-            # Status: crossed only on the last frame, else not crossed
-            status = "ARMS CROSSED" if idx == total - 1 else "ARMS NOT CROSSED"
-            cv2.putText(frame,
-                        status,
-                        (50, 100),
-                        cv2.FONT_HERSHEY_SIMPLEX,
-                        2.0,
-                        (0, 255, 0),
-                        4,
-                        cv2.LINE_AA)
+        for frame in self.frame_buffer:
             writer.write(frame)
         writer.release()
-
-        print(f"[INFO] Saved clip with overlay: {filename}")
+        print(f"[INFO] Saved clip: {filename}")
         self.last_save_time = time.time()
         self.crossed = True
 
@@ -100,61 +69,44 @@ def app_callback(pad, info, user_data):
     if buffer is None:
         return Gst.PadProbeReturn.OK
 
-    # Frame counting
     user_data.increment()
 
-    # Get format & raw frame
+    # Get raw frame
     fmt, width, height = get_caps_from_pad(pad)
     frame = None
     if user_data.use_frame and fmt and width and height:
-        rgb_frame = get_numpy_from_buffer(buffer, fmt, width, height)
-        frame = cv2.cvtColor(rgb_frame, cv2.COLOR_RGB2BGR)
-        user_data.add_frame(frame)
+        rgb = get_numpy_from_buffer(buffer, fmt, width, height)
+        frame = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
 
-    # Parse detections and keypoints
-    roi = hailo.get_roi_from_buffer(buffer)
-    dets = roi.get_objects_typed(hailo.HAILO_DETECTION)
-    kp_map = get_keypoints()
+    # Detect crossed arms
+    crossed = False
+    if frame is not None:
+        roi = hailo.get_roi_from_buffer(buffer)
+        dets = roi.get_objects_typed(hailo.HAILO_DETECTION)
+        kp_map = get_keypoints()
+        for det in dets:
+            if det.get_label() != "person":
+                continue
+            bbox = det.get_bbox()
+            landmarks = det.get_objects_typed(hailo.HAILO_LANDMARKS)
+            if not landmarks:
+                continue
+            pts = landmarks[0].get_points()
+            lw = pts[kp_map['left_wrist']]
+            rw = pts[kp_map['right_wrist']]
+            nose = pts[kp_map['nose']]
+            lx = int((lw.x()*bbox.width() + bbox.xmin()) * width)
+            ly = int((lw.y()*bbox.height()+bbox.ymin()) * height)
+            rx = int((rw.x()*bbox.width() + bbox.xmin()) * width)
+            ry = int((rw.y()*bbox.height()+bbox.ymin()) * height)
+            nx = int((nose.x()*bbox.width()+bbox.xmin()) * width)
+            ny = int((nose.y()*bbox.height()+bbox.ymin()) * height)
+            if ly < ny and ry < ny and lx > rx:
+                crossed = True
+                break
 
-    crossed_detected = False
-    for det in dets:
-        if det.get_label() != "person":
-            continue
-        bbox = det.get_bbox()
-        landmarks = det.get_objects_typed(hailo.HAILO_LANDMARKS)
-        if not landmarks:
-            continue
-        pts = landmarks[0].get_points()
-
-        # Compute wrist & nose positions
-        lw = pts[kp_map['left_wrist']]
-        rw = pts[kp_map['right_wrist']]
-        nose = pts[kp_map['nose']]
-        lx = int((lw.x()*bbox.width() + bbox.xmin()) * width)
-        ly = int((lw.y()*bbox.height()+bbox.ymin()) * height)
-        rx = int((rw.x()*bbox.width() + bbox.xmin()) * width)
-        ry = int((rw.y()*bbox.height()+bbox.ymin()) * height)
-        nx = int((nose.x()*bbox.width()+bbox.xmin()) * width)
-        ny = int((nose.y()*bbox.height()+bbox.ymin()) * height)
-
-        # Draw wrist indicators
-        if frame is not None:
-            cv2.circle(frame, (lx, ly), 5, (0, 255, 0), -1)
-            cv2.circle(frame, (rx, ry), 5, (0, 255, 0), -1)
-
-        # Check: both wrists above nose & left wrist to the right
-        if ly < ny and ry < ny and lx > rx:
-            crossed_detected = True
-            break
-
-    # Save buffer if newly crossed and sufficient time passed
-    now = time.time()
-    if crossed_detected and not user_data.crossed and (now - user_data.last_save_time) > BUFFER_SECONDS:
-        user_data.save_buffered_clip(width, height)
-
-    # Overlay status text on live frame
-    if user_data.use_frame and frame is not None:
-        status = "ARMS CROSSED" if crossed_detected else "ARMS NOT CROSSED"
+        # Overlay status on frame
+        status = "ARMS CROSSED" if crossed else "ARMS NOT CROSSED"
         cv2.putText(frame,
                     status,
                     (50, 100),
@@ -164,6 +116,14 @@ def app_callback(pad, info, user_data):
                     4,
                     cv2.LINE_AA)
         user_data.set_frame(frame)
+        self_frame = frame.copy()
+        # Add annotated frame to buffer
+        user_data.frame_buffer.append(self_frame)
+
+    # Save buffer if crossed
+    now = time.time()
+    if crossed and not user_data.crossed and (now - user_data.last_save_time) > BUFFER_SECONDS:
+        user_data.save_buffered_clip(width, height)
 
     return Gst.PadProbeReturn.OK
 
@@ -173,7 +133,6 @@ def app_callback(pad, info, user_data):
 if __name__ == "__main__":
     Gst.init(None)
     user_data = user_app_callback_class()
-    # Enable OpenCV display of frames
     user_data.use_frame = True
     app = GStreamerPoseEstimationApp(app_callback, user_data)
     app.run()
