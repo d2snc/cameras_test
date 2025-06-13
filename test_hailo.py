@@ -11,6 +11,16 @@ from gi.repository import Gst, GLib
 import cv2, numpy as np, hailo, os, time, threading, multiprocessing as mp
 from collections import deque
 from datetime import datetime
+
+
+from hailo_apps_infra.hailo_rpi_common import (
+    get_caps_from_pad,
+    get_numpy_from_buffer,
+    app_callback_class,
+)
+from hailo_apps_infra.pose_estimation_pipeline import GStreamerPoseEstimationApp
+
+
 # ----------------------------------------------------------
 #  GPIO section identical to your original -----------------
 # ----------------------------------------------------------
