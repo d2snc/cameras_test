@@ -184,15 +184,18 @@ def app_callback(pad, info, user_data):
 
     frame = None
     if user_data.use_frame:
-        frame = get_numpy_from_buffer(buffer, format, width, height)
         # --- AGGRESSIVE DEBUGGING ---
-        # Let's see if the frame object is valid after the conversion attempt.
+        # Let's check the buffer size BEFORE trying to convert it.
+        buffer_size = buffer.get_size()
+        expected_size = width * height * 3 # For RGB
+        print(f"DEBUG: Buffer size is {buffer_size}. Expected size for {width}x{height} RGB is {expected_size}.")
+        # --- END DEBUGGING ---
+        
+        frame = get_numpy_from_buffer(buffer, format, width, height)
         if frame is not None:
-             print(f"DEBUG: get_numpy_from_buffer returned a valid frame of shape {frame.shape}")
              user_data.frame_buffer.append(frame.copy())
         else:
              print("DEBUG: get_numpy_from_buffer returned None. Frame not added to buffer.")
-        # --- END DEBUGGING ---
 
 
     roi = hailo.get_roi_from_buffer(buffer)
