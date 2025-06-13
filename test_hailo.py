@@ -1,240 +1,246 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Pose-Estimation + “arms-crossed” trigger for Hailo-8 on Raspberry Pi 5  
-──────────────────────────────────────────────────────────────────────
-• Listens to GStreamerPoseEstimationApp (hailo_apps_infra).  
-• Keeps a rolling 22-second frame-buffer (≈20 s before + 2 s depois).  
-• When the operator crosses both wrists above the head for ≥0.8 s:
-      – pulses GPIO-17 LED for 3 s (libgpiod)  
-      – saves the buffered clip to gravacoes/AAAAMMDD_HHMMSS.avi  
-• Optional on-screen OSD showing “ARMS CROSSED / ARMS NOT CROSSED”.  
-Tested under Bullseye 64-bit with Python 3.11, GStreamer 1.22 and
-hailo-rt-sdk 4.26.  Requires:
-    sudo apt install python3-gpiod python3-opencv python3-gi
-"""
-# ───── Imports ──────────────────────────────────────────────────────
-import gi, os, cv2, time, threading
+import gi
+gi.require_version('Gst', '1.0')
+from gi.repository import Gst, GLib
+import os
+import numpy as np
+import cv2
+import hailo
+import time
+import threading
 from collections import deque
 from datetime import datetime
 
-gi.require_version('Gst', '1.0')
-from gi.repository import Gst, GLib
-
-import numpy as np
-import hailo
 from hailo_apps_infra.hailo_rpi_common import (
-    get_caps_from_pad, get_numpy_from_buffer, app_callback_class,
+    get_caps_from_pad,
+    get_numpy_from_buffer,
+    app_callback_class,
 )
 from hailo_apps_infra.pose_estimation_pipeline import GStreamerPoseEstimationApp
 
-# ───── GPIO via libgpiod ────────────────────────────────────────────
+# -----------------------------------------------------------------------------------------------
+# GPIO Configuration
+# -----------------------------------------------------------------------------------------------
+LED_AVAILABLE = False
 try:
     import gpiod
-    CHIP_NAME = "gpiochip0"
-    LED_LINE_OFFSET = 17
-    _chip = gpiod.Chip(CHIP_NAME)
-    _led  = _chip.get_line(LED_LINE_OFFSET)
-    _led.request(consumer="pose-led", type=gpiod.LINE_REQ_DIR_OUT, default_vals=[0])
-    LED_OK = True
+    CHIP_NAME = "gpiochip4"  # On RPi 5, GPIOs are on chip 4
+    LED_LINE_OFFSET = 17      # GPIO 17
+    chip = gpiod.Chip(CHIP_NAME)
+    led_line = chip.get_line(LED_LINE_OFFSET)
+    led_line.request(
+        consumer="hailo-led",
+        type=gpiod.LINE_REQ_DIR_OUT,
+        default_vals=[0],
+    )
+    LED_AVAILABLE = True
+    print("GPIO setup for LED on pin 17 successful.")
 except Exception as e:
-    print("GPIO17 LED disabled:", e)
-    LED_OK = False
+    print(f"LED disabled (gpiod unavailable or setup failed): {e}")
 
-_last_led_pulse = 0.0
-def pulse_led(duration: float = 3.0):
-    """Light GPIO-17 for *duration* seconds (non-blocking)."""
-    global _last_led_pulse
-    if not LED_OK: return
-    t_now = time.time()
-    if t_now - _last_led_pulse < 0.2:  # debounce
-        return
-    _last_led_pulse = t_now
-    _led.set_value(1)
-    threading.Timer(duration, lambda: _led.set_value(0), daemon=True).start()
+# -----------------------------------------------------------------------------------------------
+# Recording and Pose Detection Configuration
+# -----------------------------------------------------------------------------------------------
+BUFFER_SECONDS = 22  # 20 seconds before, 2 seconds after
+RECORDING_FOLDER = "recordings"
+FILE_PREFIX = "arms_crossed_"
+POSE_CONFIDENCE_THRESHOLD = 0.5 # Confidence for keypoints
+POSE_DURATION_SECONDS = 0.8 # How long the pose must be held to trigger
 
-# ───── Helper: COCO keypoints map ───────────────────────────────────
-def get_keypoints():
-    return {
-        'nose': 0,
-        'left_eye': 1,   'right_eye': 2,
-        'left_ear': 3,   'right_ear': 4,
-        'left_shoulder': 5,  'right_shoulder': 6,
-        'left_elbow': 7,     'right_elbow': 8,
-        'left_wrist': 9,     'right_wrist': 10,
-        'left_hip': 11,      'right_hip': 12,
-        'left_knee': 13,     'right_knee': 14,
-        'left_ankle': 15,    'right_ankle': 16,
-    }
-KP = get_keypoints()
+if not os.path.exists(RECORDING_FOLDER):
+    os.makedirs(RECORDING_FOLDER)
 
-# ───── Parameters ──────────────────────────────────────────────────
-BUFFER_SECONDS = 22            # 20 s antes + 2 s depois
-FPS_FALLBACK   = 30            # usado até FPS real ser medido
-DETECTION_HOLD = 0.8           # seg. que os braços devem ficar cruzados
-POST_SECONDS   = 2.0           # quanto tempo gravar depois do gatilho
-SAVE_DIR       = "gravacoes"
-os.makedirs(SAVE_DIR, exist_ok=True)
-
-# ───── Frame buffer + state container ──────────────────────────────
-class PoseAppState(app_callback_class):
-    """Extends hailo app_callback_class with circular buffer & logic."""
+# -----------------------------------------------------------------------------------------------
+# User-defined class to be used in the callback function
+# -----------------------------------------------------------------------------------------------
+class user_app_callback_class(app_callback_class):
     def __init__(self):
         super().__init__()
-        self.deque_frames   = deque(maxlen=FPS_FALLBACK*BUFFER_SECONDS)
-        self.deque_time     = deque(maxlen=FPS_FALLBACK*BUFFER_SECONDS)
-        self.fps_estimate   = FPS_FALLBACK
-        self.last_fps_calc  = time.time()
-        self.frame_counter  = 0
+        self.frame_buffer = deque()
+        self.is_recording = False
+        self.pose_start_time = None
+        self._last_led_pulse_time = 0
 
-        # trigger/detection
-        self.cross_start_ts = None
-        self.triggered      = False
-        self.save_running   = False
-        self.save_until_ts  = 0.0
+    def update_buffer_size(self, fps):
+        """Dynamically adjusts the buffer size based on FPS."""
+        if fps > 0:
+            max_len = int(fps * BUFFER_SECONDS)
+            if self.frame_buffer.maxlen != max_len:
+                # Recreate the deque with the new maxlen
+                current_frames = list(self.frame_buffer)
+                self.frame_buffer = deque(current_frames, maxlen=max_len)
+                print(f"Frame buffer resized to {max_len} frames for {fps:.1f} FPS.")
 
-    # ───────── Frame push ──────────────────────────────────────────
-    def push_frame(self, frame):
-        now = time.time()
-        self.deque_frames.append(frame.copy())
-        self.deque_time.append(now)
-        # dynamic FPS update every second
-        self.frame_counter += 1
-        if now - self.last_fps_calc >= 1.0:
-            self.fps_estimate = self.frame_counter / (now - self.last_fps_calc)
-            target_len = int(self.fps_estimate * BUFFER_SECONDS)
-            if target_len != self.deque_frames.maxlen:
-                self.deque_frames = deque(self.deque_frames, maxlen=target_len)
-                self.deque_time   = deque(self.deque_time,   maxlen=target_len)
-            self.frame_counter = 0
-            self.last_fps_calc = now
-
-    # ───────── Persist clip ───────────────────────────────────────
-    def save_clip_async(self):
-        if self.save_running: return
-        self.save_running = True
-
-        frames_to_write = list(self.deque_frames)
-        ts_str = datetime.now().strftime("%Y%m%d_%H%M%S")
-        fname  = os.path.join(SAVE_DIR, f"bracos_{ts_str}.avi")
-        fourcc = cv2.VideoWriter_fourcc(*"XVID")
-        h, w   = frames_to_write[0].shape[:2]
-        writer = cv2.VideoWriter(fname, fourcc,
-                                 max(10, min(self.fps_estimate, 30)),
-                                 (w, h))
-        if not writer.isOpened():
-            print("‼️  VideoWriter failed")
-            self.save_running = False
+    def pulse_led(self, duration=3.0):
+        """Turns the LED on for a specified duration."""
+        if not LED_AVAILABLE:
             return
-        print(f"💾 Salvando vídeo {fname} ({len(frames_to_write)} frames)…")
-        for f in frames_to_write:
-            writer.write(f)
+        now = time.time()
+        # Prevent rapid re-triggering
+        if now - self._last_led_pulse_time < duration + 1.0:
+            return
+        self._last_led_pulse_time = now
+        print(f"Turning LED ON for {duration} seconds.")
+        led_line.set_value(1)
+        # Schedule the LED to turn off
+        t = threading.Timer(duration, lambda: led_line.set_value(0))
+        t.daemon = True
+        t.start()
+
+    def save_video_from_buffer(self, width, height, fps):
+        """Saves the buffered frames to a video file."""
+        if self.is_recording or len(self.frame_buffer) == 0:
+            return
+        self.is_recording = True
+
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = os.path.join(RECORDING_FOLDER, f"{FILE_PREFIX}{timestamp}.mp4")
+        
+        # Make a copy to prevent issues with the buffer changing during saving
+        frames_to_save = list(self.frame_buffer)
+
+        print(f"Starting video save to {filename} with {len(frames_to_save)} frames.")
+        
+        # Run saving in a separate thread to not block the pipeline
+        thread = threading.Thread(target=self._write_video_file, args=(filename, frames_to_save, width, height, fps))
+        thread.daemon = True
+        thread.start()
+
+    def _write_video_file(self, filename, frames, width, height, fps):
+        """The actual video writing logic."""
+        # Use MP4V codec for better compatibility
+        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+        # Use a reasonable FPS, capping at 30
+        save_fps = min(fps if fps > 0 else 30, 30)
+        writer = cv2.VideoWriter(filename, fourcc, save_fps, (width, height))
+        
+        if not writer.isOpened():
+            print(f"Error: Could not open video writer for {filename}")
+            self.is_recording = False
+            return
+
+        for frame in frames:
+            # Ensure the frame is in BGR format for OpenCV
+            writer.write(cv2.cvtColor(frame, cv2.COLOR_RGB2BGR))
+        
         writer.release()
-        print(f"✅ Vídeo salvo: {fname}")
-        self.save_running = False
+        print(f"Successfully saved video: {filename}")
+        self.is_recording = False
 
-# ───── Pose / arms-crossed heuristics ──────────────────────────────
-def arms_crossed(kp_abs, kp_conf, frame_w):
-    """
-    kp_abs  – dict {name:(x,y)} in *pixels* (image coordinates)
-    kp_conf – dict {name:confidence_bool}
-    """
-    needed = ['left_wrist','right_wrist','left_shoulder','right_shoulder','nose']
-    if not all(kp_conf.get(k, False) for k in needed):
-        return False
 
-    lw, rw = kp_abs['left_wrist'], kp_abs['right_wrist']
-    ls, rs = kp_abs['left_shoulder'], kp_abs['right_shoulder']
-    nose   = kp_abs['nose']
-
-    wrists_above_head = lw[1] < nose[1] and rw[1] < nose[1]
-    wrists_cross      = (lw[0] > rs[0] and rw[0] < ls[0] and lw[0] > rw[0])
-    close_horiz       = abs(lw[0]-rw[0]) < frame_w * 0.30
-
-    return wrists_above_head and wrists_cross and close_horiz
-
-# ───── GST Pad-probe callback ──────────────────────────────────────
-def gst_callback(pad: Gst.Pad, info: Gst.PadProbeInfo, state: PoseAppState):
-    buf = info.get_buffer()
-    if buf is None:
+# -----------------------------------------------------------------------------------------------
+# User-defined callback function
+# -----------------------------------------------------------------------------------------------
+def app_callback(pad, info, user_data):
+    buffer = info.get_buffer()
+    if not buffer:
         return Gst.PadProbeReturn.OK
 
-    fmt, W, H = get_caps_from_pad(pad)
-    if fmt is None or W is None or H is None:
-        return Gst.PadProbeReturn.OK
+    user_data.increment()
+    
+    # Get frame properties
+    format, width, height = get_caps_from_pad(pad)
+    fps = user_data.get_fps()
+    
+    # Dynamically update buffer size based on measured FPS
+    user_data.update_buffer_size(fps)
 
-    # Convert frame to numpy (RGB)
-    frame = get_numpy_from_buffer(buf, fmt, W, H)
-    kp_map = {}
-    kp_conf = {}
+    frame = None
+    if user_data.use_frame and all((format, width, height)):
+        frame = get_numpy_from_buffer(buffer, format, width, height)
+        # Add frame to buffer
+        user_data.frame_buffer.append(frame.copy())
 
-    # Parse Hailo detections/landmarks
-    roi = hailo.get_roi_from_buffer(buf)
+    # Get detections
+    roi = hailo.get_roi_from_buffer(buffer)
     detections = roi.get_objects_typed(hailo.HAILO_DETECTION)
+    
+    keypoints_map = get_keypoints()
+    arms_crossed_detected = False
 
-    crossed_now = False
-    for det in detections:
-        if det.get_label() != "person":  # ignore non-person
-            continue
-        landmarks = det.get_objects_typed(hailo.HAILO_LANDMARKS)
-        if len(landmarks) == 0:
-            continue
-        pts = landmarks[0].get_points()
-        bbox = det.get_bbox()
-        # Build absolute coordinates dict
-        for name, idx in KP.items():
-            if idx >= len(pts): continue
-            p = pts[idx]
-            x = int((p.x() * bbox.width()  + bbox.xmin()) * W)
-            y = int((p.y() * bbox.height() + bbox.ymin()) * H)
-            kp_map[name]   = (x, y)
-            kp_conf[name]  = p.score() > 0.5 if hasattr(p, "score") else True
+    for detection in detections:
+        if detection.get_label() == "person":
+            landmarks = detection.get_objects_typed(hailo.HAILO_LANDMARKS)
+            if not landmarks:
+                continue
 
-        crossed_now = arms_crossed(kp_map, kp_conf, W) or crossed_now
+            points = landmarks[0].get_points()
+            kpts = {}
+            for name, index in keypoints_map.items():
+                point = points[index]
+                if point.confidence() > POSE_CONFIDENCE_THRESHOLD:
+                    # Scale points to frame dimensions
+                    bbox = detection.get_bbox()
+                    kpts[name] = (
+                        int((point.x() * bbox.width() + bbox.xmin()) * width),
+                        int((point.y() * bbox.height() + bbox.ymin()) * height)
+                    )
 
-    # ── OSD (optional)──────────────────────────────────────────────
-    if state.use_frame:
-        frame_bgr = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
-        text = "ARMS CROSSED" if crossed_now else "ARMS NOT CROSSED"
-        color = (0,0,255) if crossed_now else (0,255,0)
-        cv2.putText(frame_bgr, text, (30,60), cv2.FONT_HERSHEY_SIMPLEX,
-                    1.4, color, 3, cv2.LINE_AA)
-        state.set_frame(frame_bgr)
-        frame_to_buffer = frame_bgr
+            # Check for the "arms crossed above head" pose
+            required_kpts = ['left_wrist', 'right_wrist', 'left_shoulder', 'right_shoulder', 'nose']
+            if all(kpt in kpts for kpt in required_kpts):
+                lw, rw = kpts['left_wrist'], kpts['right_wrist']
+                ls, rs = kpts['left_shoulder'], kpts['right_shoulder']
+                ns = kpts['nose']
+
+                # Condition 1: Wrists are crossed horizontally (left wrist is to the right of the right shoulder)
+                wrists_crossed = lw[0] > rs[0] and rw[0] < ls[0]
+                # Condition 2: Both wrists are above the nose
+                arms_above_head = lw[1] < ns[1] and rw[1] < ns[1]
+
+                if wrists_crossed and arms_above_head:
+                    arms_crossed_detected = True
+                    break # A person is in the pose, no need to check others
+
+    # State machine for pose detection and triggering actions
+    if arms_crossed_detected:
+        if user_data.pose_start_time is None:
+            user_data.pose_start_time = time.time()
+        elif time.time() - user_data.pose_start_time >= POSE_DURATION_SECONDS:
+            if not user_data.is_recording:
+                print("Arms crossed pose held. Triggering actions.")
+                user_data.pulse_led()
+                user_data.save_video_from_buffer(width, height, fps)
+                # Reset after triggering to prevent immediate re-trigger
+                user_data.pose_start_time = None 
     else:
-        frame_to_buffer = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
-
-    # ── Buffer & trigger state machine ─────────────────────────────
-    now = time.time()
-    state.push_frame(frame_to_buffer)
-
-    if crossed_now:
-        if state.cross_start_ts is None:
-            state.cross_start_ts = now
-        elif (now - state.cross_start_ts >= DETECTION_HOLD) and not state.triggered:
-            # Trigger!
-            state.triggered = True
-            state.save_until_ts = now + POST_SECONDS
-            pulse_led(3.0)
-            print("⚠️  Braços cruzados detectados – iniciando contagem para salvar vídeo")
-    else:
-        state.cross_start_ts = None
-
-    # When post-window expires, dump clip
-    if state.triggered and now >= state.save_until_ts:
-        state.triggered = False
-        threading.Thread(target=state.save_clip_async, daemon=True).start()
-
+        # If pose is no longer detected, reset the timer
+        if user_data.pose_start_time is not None:
+            print("Pose broken.")
+            user_data.pose_start_time = None
+            
+    # Optional: Draw keypoints on the frame for visualization
+    if frame is not None and user_data.use_frame:
+        if arms_crossed_detected:
+             cv2.putText(frame, "ARMS CROSSED!", (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+        bgr_frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+        user_data.set_frame(bgr_frame)
+        
     return Gst.PadProbeReturn.OK
 
-# ───── Entrypoint ──────────────────────────────────────────────────
+def get_keypoints():
+    """Returns a dictionary mapping keypoint names to their indices."""
+    return {
+        'nose': 0, 'left_eye': 1, 'right_eye': 2, 'left_ear': 3, 'right_ear': 4,
+        'left_shoulder': 5, 'right_shoulder': 6, 'left_elbow': 7, 'right_elbow': 8,
+        'left_wrist': 9, 'right_wrist': 10, 'left_hip': 11, 'right_hip': 12,
+        'left_knee': 13, 'right_knee': 14, 'left_ankle': 15, 'right_ankle': 16,
+    }
+
 if __name__ == "__main__":
-    print("▶️  Inicializando pipeline Hailo-8… (Ctrl-C para sair)")
-    app_state = PoseAppState()
-    # We want frames for buffer & OSD
-    app_state.use_frame = True
-    gst_app = GStreamerPoseEstimationApp(gst_callback, app_state)
-    try:
-        gst_app.run()
-    except KeyboardInterrupt:
-        print("\n⏹️  Encerrando…")
+    # The user_data object now manages state for buffering, recording, and pose detection
+    user_data = user_app_callback_class()
+    
+    # Create and run the GStreamer application
+    app = GStreamerPoseEstimationApp(app_callback, user_data)
+    
+    # Enable frame grabbing for visualization and saving
+    app.set_use_frame(True) 
+    
+    app.run()
+
+    # Cleanup GPIO on exit
+    if LED_AVAILABLE:
+        led_line.set_value(0)
+        led_line.release()
+        chip.close()
+        print("GPIO cleaned up.")
