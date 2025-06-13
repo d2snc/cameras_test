@@ -18,6 +18,58 @@ from hailo_apps_infra.hailo_rpi_common import (
 from hailo_apps_infra.pose_estimation_pipeline import GStreamerPoseEstimationApp
 
 # -----------------------------------------------------------------------------------------------
+# GPIO Configuration using libgpiod
+# -----------------------------------------------------------------------------------------------
+try:
+    import gpiod
+    
+    CHIP_NAME = "gpiochip0"         # /dev/gpiochip0
+    LED_LINE_OFFSET = 17            # GPIO-17 (BCM) = physical pin 11
+    chip = gpiod.Chip(CHIP_NAME)
+    led_line = chip.get_line(LED_LINE_OFFSET)
+    led_line.request(
+        consumer="pose-detection-led",
+        type=gpiod.LINE_REQ_DIR_OUT,
+        default_vals=[0],
+    )
+    LED_AVAILABLE = True
+    print("GPIO17 LED control initialized successfully")
+except Exception as e:
+    print(f"LED disabled (libgpiod unavailable): {e}")
+    LED_AVAILABLE = False
+
+_last_led_pulse = 0.0  # Prevent overlapping pulses
+
+def pulse_led(duration: float = 3.0):
+    """Turn on LED for 'duration' seconds, ignoring very close pulses."""
+    global _last_led_pulse
+    if not LED_AVAILABLE:
+        return
+    now = time.time()
+    if now - _last_led_pulse < 0.2:      # Already blinking recently
+        return
+    _last_led_pulse = now
+
+    led_line.set_value(1)                # Turn LED on
+    print(f"LED turned ON for {duration} seconds")
+
+    def _off():
+        led_line.set_value(0)            # Turn LED off
+        print("LED turned OFF")
+
+    t = threading.Timer(duration, _off)
+    t.daemon = True
+    t.start()
+
+# -----------------------------------------------------------------------------------------------
+# Video saving configuration
+# -----------------------------------------------------------------------------------------------
+SAVE_FOLDER = "gravacoes"
+if not os.path.exists(SAVE_FOLDER):
+    os.makedirs(SAVE_FOLDER)
+    print(f"Created folder: {SAVE_FOLDER}")
+
+# -----------------------------------------------------------------------------------------------
 # User-defined class to be used in the callback function
 # -----------------------------------------------------------------------------------------------
 class user_app_callback_class(app_callback_class):
@@ -37,6 +89,7 @@ class user_app_callback_class(app_callback_class):
         self.capture_extra_frames = 150  # 5 seconds of extra frames after trigger
         self.frames_after_trigger = 0
         self.triggered = False
+        self.total_detections = 0  # Counter for total arms crossed detections
 
     def add_frame_to_buffer(self, frame):
         """Add frame to circular buffer"""
@@ -44,7 +97,7 @@ class user_app_callback_class(app_callback_class):
             self.frame_buffer.append(frame.copy())
 
     def save_buffer_to_video(self):
-        """Save the frame buffer to a video file"""
+        """Save the frame buffer to a video file in the gravacoes folder"""
         if self.saving_video:
             return
         
@@ -61,7 +114,7 @@ class user_app_callback_class(app_callback_class):
         
         # Create video filename with timestamp
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"arms_crossed_{timestamp}.mp4"
+        filename = os.path.join(SAVE_FOLDER, f"arms_crossed_{timestamp}.mp4")
         
         # Get frame dimensions from the first frame
         if len(frames_to_save) > 0:
@@ -78,6 +131,7 @@ class user_app_callback_class(app_callback_class):
             out.release()
             print(f"Video saved: {filename} ({len(frames_to_save)} frames)")
             print(f"Video duration: {len(frames_to_save)/self.fps:.1f} seconds")
+            print(f"Video location: {os.path.abspath(filename)}")
         
         self.saving_video = False
         self.triggered = False
@@ -244,7 +298,11 @@ def app_callback(pad, info, user_data):
                 user_data.capture_trigger_time = current_time
                 user_data.triggered = True
                 user_data.frames_after_trigger = 0
+                user_data.total_detections += 1
                 print("Arms crossed detected! Capturing additional frames...")
+                
+                # Activate LED when arms are crossed
+                pulse_led(3.0)
     else:
         user_data.status_text = "Arms Not Crossed"
         user_data.arms_crossed_detected = False
@@ -296,6 +354,16 @@ def app_callback(pad, info, user_data):
             cv2.putText(frame, capture_text, (text_x, text_y + 70), 
                        font, 0.6, (255, 255, 0), 1, cv2.LINE_AA)
         
+        # Add detection counter
+        counter_text = f"Total Detections: {user_data.total_detections}"
+        cv2.putText(frame, counter_text, (text_x, text_y + 100), 
+                   font, 0.6, (255, 255, 0), 1, cv2.LINE_AA)
+        
+        # Add save folder info
+        folder_text = f"Save folder: {SAVE_FOLDER}"
+        cv2.putText(frame, folder_text, (text_x, frame.shape[0] - 20), 
+                   font, 0.5, (200, 200, 200), 1, cv2.LINE_AA)
+        
         # Add frame to buffer
         user_data.add_frame_to_buffer(frame)
         
@@ -305,8 +373,35 @@ def app_callback(pad, info, user_data):
     print(string_to_print)
     return Gst.PadProbeReturn.OK
 
+# -----------------------------------------------------------------------------------------------
+# Cleanup function for GPIO
+# -----------------------------------------------------------------------------------------------
+def cleanup_gpio():
+    """Clean up GPIO resources"""
+    if LED_AVAILABLE:
+        try:
+            led_line.set_value(0)  # Make sure LED is off
+            print("GPIO cleanup completed")
+        except:
+            pass
+
 if __name__ == "__main__":
-    # Create an instance of the user app callback class
-    user_data = user_app_callback_class()
-    app = GStreamerPoseEstimationApp(app_callback, user_data)
-    app.run()
+    try:
+        # Create an instance of the user app callback class
+        user_data = user_app_callback_class()
+        app = GStreamerPoseEstimationApp(app_callback, user_data)
+        
+        print("\n=== Pose Detection with Arms Crossed Detection ===")
+        print(f"Videos will be saved to: {os.path.abspath(SAVE_FOLDER)}")
+        print(f"GPIO17 LED control: {'Enabled' if LED_AVAILABLE else 'Disabled'}")
+        print("Detection: Arms crossed above head")
+        print("LED Duration: 3 seconds when detected")
+        print("Video: 30 seconds before + moment of crossing")
+        print("Press Ctrl+C to exit\n")
+        
+        app.run()
+        
+    except KeyboardInterrupt:
+        print("\nShutting down...")
+    finally:
+        cleanup_gpio()
