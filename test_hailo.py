@@ -59,13 +59,37 @@ class user_app_callback_class(app_callback_class):
         self.is_recording = False
         self.pose_start_time = None
         self._last_led_pulse_time = 0
+        
+        # --- FPS Calculation Attributes ---
+        self._fps_last_time = time.time()
+        self._fps_last_frame_count = 0
+        self._fps = 0.0
+        # ----------------------------------
+
+    def get_fps(self):
+        """Calculates and returns the current FPS."""
+        # We use the total frame count from the base class `app_callback_class` via self.get_count()
+        total_frames = self.get_count()
+        current_time = time.time()
+        elapsed_time = current_time - self._fps_last_time
+        
+        # Update FPS calculation at least every second for stability
+        if elapsed_time >= 1.0:
+            frames_since_last = total_frames - self._fps_last_frame_count
+            self._fps = frames_since_last / elapsed_time
+            
+            # Reset for the next calculation interval
+            self._fps_last_time = current_time
+            self._fps_last_frame_count = total_frames
+            
+        return self._fps
 
     def update_buffer_size(self, fps):
         """Dynamically adjusts the buffer size based on FPS."""
         if fps > 0:
             max_len = int(fps * BUFFER_SECONDS)
             if self.frame_buffer.maxlen != max_len:
-                # Recreate the deque with the new maxlen
+                # Recreate the deque with the new maxlen while preserving content
                 current_frames = list(self.frame_buffer)
                 self.frame_buffer = deque(current_frames, maxlen=max_len)
                 print(f"Frame buffer resized to {max_len} frames for {fps:.1f} FPS.")
@@ -139,7 +163,7 @@ def app_callback(pad, info, user_data):
     
     # Get frame properties
     format, width, height = get_caps_from_pad(pad)
-    fps = user_data.get_fps()
+    fps = user_data.get_fps() # This now calls the method implemented in our class
     
     # Dynamically update buffer size based on measured FPS
     user_data.update_buffer_size(fps)
