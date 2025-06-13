@@ -60,6 +60,12 @@ class user_app_callback_class(app_callback_class):
         self.pose_start_time = None
         self.pose_triggered_this_cycle = False # Flag to prevent re-triggering
         
+        # --- Video Property Storage ---
+        self.width = 0
+        self.height = 0
+        self.format = None
+        # ------------------------------
+        
         # --- FPS Calculation Attributes ---
         self._fps_last_time = time.time()
         self._fps_last_frame_count = 0
@@ -157,13 +163,27 @@ def app_callback(pad, info, user_data):
 
     user_data.increment()
     
-    format, width, height = get_caps_from_pad(pad)
+    # If we haven't stored the video dimensions yet, try to get them.
+    if user_data.width == 0 or user_data.height == 0:
+        format, width, height = get_caps_from_pad(pad)
+        if width and height and format:
+            print(f"INFO: Storing video properties - {width}x{height}, Format: {format}")
+            user_data.width = width
+            user_data.height = height
+            user_data.format = format
+
+    # Exit early if we still don't have video properties.
+    if user_data.width == 0:
+        return Gst.PadProbeReturn.OK
+
+    # Use stored properties from now on
+    width, height, format = user_data.width, user_data.height, user_data.format
     fps = user_data.get_fps()
     
     user_data.update_buffer_size(fps)
 
     frame = None
-    if user_data.use_frame and all((format, width, height)):
+    if user_data.use_frame:
         frame = get_numpy_from_buffer(buffer, format, width, height)
         # CRITICAL FIX: Ensure the frame is valid before appending to buffer
         if frame is not None and frame.size > 0:
