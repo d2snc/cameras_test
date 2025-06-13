@@ -46,11 +46,11 @@ FILE_PREFIX = "arms_crossed_"
 POSE_CONFIDENCE_THRESHOLD = 0.5 # Confidence for keypoints
 POSE_DURATION_SECONDS = 0.8 # How long the pose must be held to trigger
 
-# --- Hardcoded Video Properties ---
-VIDEO_WIDTH = 1280
-VIDEO_HEIGHT = 720
-VIDEO_FORMAT = 'RGB'
-# ----------------------------------
+# --- Default Video Properties (fallback) ---
+DEFAULT_WIDTH = 1280
+DEFAULT_HEIGHT = 720
+DEFAULT_FORMAT = 'RGB'
+# ------------------------------------------
 
 if not os.path.exists(RECORDING_FOLDER):
     os.makedirs(RECORDING_FOLDER)
@@ -73,6 +73,16 @@ class user_app_callback_class(app_callback_class):
         self._fps_last_time = time.time()
         self._fps_last_frame_count = 0
         self._fps = 0.0
+        
+        # Store video properties once detected
+        self.video_width = None
+        self.video_height = None
+        self.video_format = None
+        self.caps_detected = False
+        
+        # Debug flags
+        self.debug_printed = False
+        self.frame_count = 0
 
     def get_fps(self):
         """Calculates and returns the current FPS."""
@@ -152,20 +162,72 @@ def app_callback(pad, info, user_data):
         return Gst.PadProbeReturn.OK
 
     user_data.increment()
+    user_data.frame_count += 1
     
-    # Use the hardcoded video properties
-    width, height, format = VIDEO_WIDTH, VIDEO_HEIGHT, VIDEO_FORMAT
+    # Try to get actual video properties from the pad
+    if not user_data.caps_detected:
+        try:
+            caps = get_caps_from_pad(pad)
+            if caps:
+                structure = caps.get_structure(0)
+                user_data.video_width = structure.get_value('width')
+                user_data.video_height = structure.get_value('height')
+                format_string = structure.get_value('format')
+                user_data.video_format = format_string
+                user_data.caps_detected = True
+                print(f"Detected video properties: {user_data.video_width}x{user_data.video_height}, format: {format_string}")
+        except Exception as e:
+            print(f"Failed to get caps from pad: {e}")
+            # Use fallback values
+            user_data.video_width = DEFAULT_WIDTH
+            user_data.video_height = DEFAULT_HEIGHT
+            user_data.video_format = DEFAULT_FORMAT
+            user_data.caps_detected = True
+            print(f"Using default video properties: {DEFAULT_WIDTH}x{DEFAULT_HEIGHT}, format: {DEFAULT_FORMAT}")
+    
+    width = user_data.video_width
+    height = user_data.video_height
+    format = user_data.video_format
+    
     fps = user_data.get_fps()
     user_data.update_buffer_size(fps)
 
     frame = None
     if user_data.use_frame:
-        # We call the library function with the known, correct parameters.
-        frame = get_numpy_from_buffer(buffer, format, width, height)
-        if frame is not None:
-            # We use a lock to protect buffer access, as in the working example.
-            with user_data.buffer_lock:
-                user_data.frame_buffer.append(frame.copy())
+        try:
+            # Try with detected format first
+            frame = get_numpy_from_buffer(buffer, format, width, height)
+            
+            # If that fails, try common format variations
+            if frame is None and not user_data.debug_printed:
+                print(f"Failed to get frame with format '{format}'. Trying alternatives...")
+                for alt_format in ['RGB', 'BGR', 'RGBA', 'I420', 'NV12']:
+                    frame = get_numpy_from_buffer(buffer, alt_format, width, height)
+                    if frame is not None:
+                        print(f"Success with format '{alt_format}'!")
+                        user_data.video_format = alt_format
+                        format = alt_format
+                        break
+                
+                if frame is None:
+                    print("ERROR: Could not extract frame from buffer with any format!")
+                user_data.debug_printed = True
+            
+            if frame is not None:
+                # Successfully got a frame - add to buffer
+                with user_data.buffer_lock:
+                    user_data.frame_buffer.append(frame.copy())
+                
+                # Print buffer status periodically
+                if user_data.frame_count % 100 == 0:
+                    with user_data.buffer_lock:
+                        buffer_len = len(user_data.frame_buffer)
+                    print(f"Frame {user_data.frame_count}: Buffer has {buffer_len} frames")
+                    
+        except Exception as e:
+            if not user_data.debug_printed:
+                print(f"Exception getting numpy from buffer: {e}")
+                user_data.debug_printed = True
 
     # --- The rest of the logic remains the same ---
     roi = hailo.get_roi_from_buffer(buffer)
@@ -203,7 +265,9 @@ def app_callback(pad, info, user_data):
             user_data.pose_start_time = time.time()
         elif time.time() - user_data.pose_start_time >= POSE_DURATION_SECONDS and not user_data.pose_triggered_this_cycle:
             if not user_data.is_recording:
-                print("Arms crossed pose held. Triggering actions.")
+                with user_data.buffer_lock:
+                    buffer_len = len(user_data.frame_buffer)
+                print(f"Arms crossed pose held. Buffer has {buffer_len} frames. Triggering actions.")
                 user_data.pulse_led()
                 user_data.save_video_from_buffer(width, height, fps)
                 user_data.pose_triggered_this_cycle = True
@@ -214,9 +278,23 @@ def app_callback(pad, info, user_data):
             user_data.pose_triggered_this_cycle = False
             
     if frame is not None and user_data.use_frame:
+        # Create a copy for display to avoid modifying the buffered frame
+        display_frame = frame.copy()
         if arms_crossed_detected:
-             cv2.putText(frame, "ARMS CROSSED!", (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
-        bgr_frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+             cv2.putText(display_frame, "ARMS CROSSED!", (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+        
+        # Check if frame needs color conversion for display
+        if format in ['RGB', 'RGBA']:
+            bgr_frame = cv2.cvtColor(display_frame, cv2.COLOR_RGB2BGR)
+        elif format == 'BGR':
+            bgr_frame = display_frame
+        else:
+            # For other formats, try to convert to BGR
+            try:
+                bgr_frame = cv2.cvtColor(display_frame, cv2.COLOR_RGB2BGR)
+            except:
+                bgr_frame = display_frame
+                
         user_data.set_frame(bgr_frame)
         
     return Gst.PadProbeReturn.OK
