@@ -108,7 +108,6 @@ class user_app_callback_class(app_callback_class):
 
     def save_video_from_buffer(self, width, height, fps):
         """Saves the buffered frames to a video file."""
-        print(f"DEBUG: save_video_from_buffer called. Buffer size: {len(self.frame_buffer)}. is_recording: {self.is_recording}")
         if self.is_recording or len(self.frame_buffer) == 0:
             if len(self.frame_buffer) == 0:
                 print("ERROR: Video not saved because the frame buffer is empty.")
@@ -123,7 +122,6 @@ class user_app_callback_class(app_callback_class):
         frames_to_save = list(self.frame_buffer)
 
         print(f"Starting video save to {filename} with {len(frames_to_save)} frames.")
-        print(f"Attempting to save video with dimensions {width}x{height} at {fps:.2f} FPS.")
         
         thread = threading.Thread(target=self._write_video_file, args=(filename, frames_to_save, width, height, fps))
         thread.daemon = True
@@ -184,18 +182,27 @@ def app_callback(pad, info, user_data):
 
     frame = None
     if user_data.use_frame:
-        # --- AGGRESSIVE DEBUGGING ---
-        # Let's check the buffer size BEFORE trying to convert it.
-        buffer_size = buffer.get_size()
-        expected_size = width * height * 3 # For RGB
-        print(f"DEBUG: Buffer size is {buffer_size}. Expected size for {width}x{height} RGB is {expected_size}.")
-        # --- END DEBUGGING ---
-        
-        frame = get_numpy_from_buffer(buffer, format, width, height)
-        if frame is not None:
-             user_data.frame_buffer.append(frame.copy())
+        # --- DEFINITIVE FIX: Manually map the GStreamer buffer ---
+        # This replaces the unreliable get_numpy_from_buffer() function.
+        success, map_info = buffer.map(Gst.MapFlags.READ)
+        if success:
+            # Create a numpy array from the mapped buffer data
+            numpy_frame = np.ndarray(
+                (height, width, 3), # Shape for RGB
+                buffer=map_info.data,
+                dtype=np.uint8)
+            
+            # Make a copy of the frame to release the buffer map
+            frame = numpy_frame.copy()
+            
+            # Add the copied frame to our application's buffer
+            user_data.frame_buffer.append(frame)
+            
+            # Unmap the GStreamer buffer to release its resources
+            buffer.unmap(map_info)
         else:
-             print("DEBUG: get_numpy_from_buffer returned None. Frame not added to buffer.")
+            print("Warning: Failed to map GStreamer buffer.")
+        # --- END FIX ---
 
 
     roi = hailo.get_roi_from_buffer(buffer)
