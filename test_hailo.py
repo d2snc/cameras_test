@@ -1,453 +1,217 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Pose estimation + arms-crossed detector with non-blocking
+hardware-accelerated video recorder for Raspberry Pi.
+2025-06-13 rev.2
+"""
 import gi
-gi.require_version('Gst', '1.0')
+gi.require_version("Gst", "1.0")
 from gi.repository import Gst, GLib
-import os
-import numpy as np
-import cv2
-import hailo
+import cv2, numpy as np, hailo, os, time, threading, multiprocessing as mp
 from collections import deque
-import threading
-import time
 from datetime import datetime
-
-from hailo_apps_infra.hailo_rpi_common import (
-    get_caps_from_pad,
-    get_numpy_from_buffer,
-    app_callback_class,
-)
-from hailo_apps_infra.pose_estimation_pipeline import GStreamerPoseEstimationApp
-
-# -----------------------------------------------------------------------------------------------
-# GPIO Configuration using libgpiod
-# -----------------------------------------------------------------------------------------------
+# ----------------------------------------------------------
+#  GPIO section identical to your original -----------------
+# ----------------------------------------------------------
 try:
     import gpiod
-    
-    CHIP_NAME = "gpiochip0"         # /dev/gpiochip0
-    LED_LINE_OFFSET = 17            # GPIO-17 (BCM) = physical pin 11
-    chip = gpiod.Chip(CHIP_NAME)
-    led_line = chip.get_line(LED_LINE_OFFSET)
-    led_line.request(
-        consumer="pose-detection-led",
-        type=gpiod.LINE_REQ_DIR_OUT,
-        default_vals=[0],
-    )
-    LED_AVAILABLE = True
-    print("GPIO17 LED control initialized successfully")
+    _chip = gpiod.Chip("gpiochip0")
+    _led  = _chip.get_line(17)
+    _led.request(consumer="pose-led", type=gpiod.LINE_REQ_DIR_OUT, default_vals=[0])
+    LED_OK = True
 except Exception as e:
-    print(f"LED disabled (libgpiod unavailable): {e}")
-    LED_AVAILABLE = False
+    print("GPIO17 LED disabled:", e)
+    LED_OK = False
 
-_last_led_pulse = 0.0  # Prevent overlapping pulses
+def pulse_led(duration=3.0):
+    if not LED_OK: return
+    _led.set_value(1)
+    threading.Timer(duration, lambda: _led.set_value(0), daemon=True).start()
 
-def pulse_led(duration: float = 3.0):
-    """Turn on LED for 'duration' seconds, ignoring very close pulses."""
-    global _last_led_pulse
-    if not LED_AVAILABLE:
-        return
-    now = time.time()
-    if now - _last_led_pulse < 0.2:      # Already blinking recently
-        return
-    _last_led_pulse = now
+# ----------------------------------------------------------
+#  Asynchronous saver process ------------------------------
+# ----------------------------------------------------------
+def saver_proc(frame_q: mp.Queue, stop_q: mp.Queue, w, h, fps):
+    """
+    Receives JPEG bytes on frame_q, writes an MP4 with hardware H.264.
+    Terminates when stop_q gets any message.
+    """
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    mp4_path = os.path.join("gravacoes", f"arms_crossed_{ts}.mp4")
+    print(f"[Saver] Starting file {mp4_path}")
 
-    led_line.set_value(1)                # Turn LED on
-    print(f"LED turned ON for {duration} seconds")
+    # ---------- Try GStreamer (fast, HW) ----------
+    gst_cmd = (
+        f"gst-launch-1.0 -q appsrc name=appsrc is-live=true block=true "
+        f"format=3 do-timestamp=true ! jpegdec ! "
+        f"videoconvert ! video/x-raw,format=I420,width={w},height={h},framerate={fps}/1 ! "
+        f"v4l2h264enc extra-controls=\"encode,frame_level_rate_control_enable=true\" "
+        f"keyframe-period={fps*2} ! h264parse ! mp4mux name=mux ! filesink location={mp4_path}"
+    )
+    try:
+        import subprocess, shlex
+        proc = subprocess.Popen(shlex.split(gst_cmd), stdin=subprocess.PIPE)
+        use_gst = True
+    except Exception as e:
+        print("[Saver] HW-encode unavailable, falling back to OpenCV:", e)
+        fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+        vw = cv2.VideoWriter(mp4_path, fourcc, fps, (w, h))
+        use_gst = False
 
-    def _off():
-        led_line.set_value(0)            # Turn LED off
-        print("LED turned OFF")
+    frames = 0
+    while True:
+        if not frame_q.empty():
+            jpeg_bytes = frame_q.get()
+            if jpeg_bytes is None:   # poison pill
+                break
+            if use_gst:
+                proc.stdin.write(jpeg_bytes)
+            else:
+                np_buf  = np.frombuffer(jpeg_bytes, dtype=np.uint8)
+                frame   = cv2.imdecode(np_buf, cv2.IMREAD_COLOR)
+                vw.write(frame)
+            frames += 1
+        elif not stop_q.empty():
+            # Main process says "we're done"; send poison pill when queue drained
+            frame_q.put(None)
 
-    t = threading.Timer(duration, _off)
-    t.daemon = True
-    t.start()
+        time.sleep(0.001)
 
-# -----------------------------------------------------------------------------------------------
-# Video saving configuration
-# -----------------------------------------------------------------------------------------------
-SAVE_FOLDER = "gravacoes"
-if not os.path.exists(SAVE_FOLDER):
-    os.makedirs(SAVE_FOLDER)
-    print(f"Created folder: {SAVE_FOLDER}")
+    if use_gst:
+        proc.stdin.close()
+        proc.wait()
+    else:
+        vw.release()
+    print(f"[Saver] Saved {frames} frames → {mp4_path}")
 
-# -----------------------------------------------------------------------------------------------
-# User-defined class to be used in the callback function
-# -----------------------------------------------------------------------------------------------
-class user_app_callback_class(app_callback_class):
+# ----------------------------------------------------------
+#  Pose detection callback class ---------------------------
+# ----------------------------------------------------------
+class UserCB(app_callback_class):
+    FPS               = 30
+    BUFFER            = 1200             # ~40 s of 30 fps
+    AFTER_TRIGGER     = FPS * 5          # 5 s extra
+    COOLDOWN_S        = 5
+
     def __init__(self):
         super().__init__()
-        self.frame_buffer = deque(maxlen=1050)  # 35 seconds at 30fps (30 before + 5 after)
-        self.arms_crossed_detected = False
-        self.last_arms_crossed_time = None
-        self.saving_video = False
-        self.frame_dimensions = None
-        self.fps = 30  # Assumed FPS, adjust as needed
-        self.cooldown_period = 5  # Seconds before allowing another video save
-        self.status_text = "Arms Not Crossed"
-        self.lock = threading.Lock()
-        self.capture_trigger_time = None
-        self.capture_extra_frames = 150  # 5 seconds of extra frames after trigger
-        self.frames_after_trigger = 0
-        self.triggered = False
-        self.total_detections = 0  # Counter for total arms crossed detections
-        self.save_in_progress = False  # Flag to prevent multiple saves
+        self.buf = deque(maxlen=self.BUFFER)
+        self.last_event   = 0.0
+        self.triggered    = False
+        self.after_count  = 0
+        self.saver: mp.Process|None = None
+        self.frame_q, self.stop_q  = None, None
+        self.status = "Arms Not Crossed"
+        self.tot = 0
+        self.dim = None
 
-    def add_frame_to_buffer(self, frame):
-        """Add frame to circular buffer"""
-        # Don't add frames if we're saving to avoid memory issues
-        if not self.save_in_progress:
-            with self.lock:
-                self.frame_buffer.append(frame.copy())
+    # -------------- helpers --------------
+    def _launch_saver(self, h, w):
+        self.frame_q = mp.Queue(maxsize=500)
+        self.stop_q  = mp.Queue()
+        self.saver   = mp.Process(target=saver_proc,
+                                  args=(self.frame_q, self.stop_q, w, h, self.FPS),
+                                  daemon=True)
+        self.saver.start()
 
-    def save_buffer_to_video(self):
-        """Save the frame buffer to a video file in the gravacoes folder"""
-        if self.saving_video or self.save_in_progress:
-            print("Already saving a video, skipping...")
-            return
-        
-        self.save_in_progress = True
-        
-        try:
-            # Copy frames we need before starting the save
-            with self.lock:
-                if len(self.frame_buffer) == 0:
-                    print("No frames in buffer to save")
-                    self.save_in_progress = False
-                    return
-                
-                # Calculate how many frames to save
-                total_frames_to_save = min(900 + self.frames_after_trigger, len(self.frame_buffer))
-                # Get only the frames we need
-                frames_to_save = list(self.frame_buffer)[-total_frames_to_save:]
-                print(f"Copying {len(frames_to_save)} frames for saving...")
-            
-            # Create video filename with timestamp
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            filename = os.path.join(SAVE_FOLDER, f"arms_crossed_{timestamp}.mp4")
-            
-            # Start saving in a separate thread
-            save_thread = threading.Thread(
-                target=self._do_save_video,
-                args=(frames_to_save, filename),
-                daemon=True
-            )
-            save_thread.start()
-            
-        except Exception as e:
-            print(f"Error preparing video save: {e}")
-            self.save_in_progress = False
+    def _feed_to_saver(self, frame):
+        # Compress once, share bytes
+        ok, jpg = cv2.imencode(".jpg", frame, [int(cv2.IMWRITE_JPEG_QUALITY), 85])
+        if ok and self.saver is not None:
+            self.frame_q.put(jpg.tobytes(), block=False)
 
-    def _do_save_video(self, frames, filename):
-        """Actually save the video (runs in separate thread)"""
-        self.saving_video = True
-        
-        try:
-            if len(frames) == 0:
-                print("No frames to save")
-                return
-            
-            # Get frame dimensions
-            h, w = frames[0].shape[:2]
-            
-            # Use XVID codec which is more compatible and faster
-            fourcc = cv2.VideoWriter_fourcc(*'XVID')
-            out = cv2.VideoWriter(filename.replace('.mp4', '.avi'), fourcc, self.fps, (w, h))
-            
-            if not out.isOpened():
-                print(f"Error: Could not initialize VideoWriter for {filename}")
-                return
-            
-            print(f"Saving {len(frames)} frames to {filename}...")
-            
-            # Write frames with progress updates
-            for i, frame in enumerate(frames):
-                if frame is not None:
-                    out.write(frame)
-                    
-                # Progress update every 30 frames
-                if i % 30 == 0:
-                    progress = (i / len(frames)) * 100
-                    print(f"Saving progress: {progress:.1f}%")
-            
-            out.release()
-            print(f"Video saved successfully: {filename}")
-            print(f"Video duration: {len(frames)/self.fps:.1f} seconds")
-            
-            # Clear some memory
-            frames = None
-            
-        except Exception as e:
-            print(f"Error saving video: {e}")
-        finally:
-            self.saving_video = False
-            self.save_in_progress = False
-            self.triggered = False
-            self.frames_after_trigger = 0
+# ----------------------------------------------------------
+#  Helper: minimal keypoint set ----------------------------
+# ----------------------------------------------------------
+KP = {"nose":0,"left_wrist":9,"right_wrist":10}
 
-# -----------------------------------------------------------------------------------------------
-# Utility functions
-# -----------------------------------------------------------------------------------------------
-
-def get_keypoints():
-    """Get the COCO keypoints and their left/right flip coorespondence map."""
-    keypoints = {
-        'nose': 0,
-        'left_eye': 1,
-        'right_eye': 2,
-        'left_ear': 3,
-        'right_ear': 4,
-        'left_shoulder': 5,
-        'right_shoulder': 6,
-        'left_elbow': 7,
-        'right_elbow': 8,
-        'left_wrist': 9,
-        'right_wrist': 10,
-        'left_hip': 11,
-        'right_hip': 12,
-        'left_knee': 13,
-        'right_knee': 14,
-        'left_ankle': 15,
-        'right_ankle': 16,
-    }
-    return keypoints
-
-def check_arms_crossed_above_head(points, bbox, width, height, keypoints):
-    """
-    Check if arms are crossed above head
-    Returns True if both wrists are above the head and crossed
-    """
+def crossed(points, bbox, W, H):
     try:
-        # Get keypoint indices
-        left_wrist_idx = keypoints['left_wrist']
-        right_wrist_idx = keypoints['right_wrist']
-        nose_idx = keypoints['nose']
-        
-        # Get actual coordinates
-        left_wrist = points[left_wrist_idx]
-        right_wrist = points[right_wrist_idx]
-        nose = points[nose_idx]
-        
-        # Convert to absolute coordinates
-        left_wrist_x = (left_wrist.x() * bbox.width() + bbox.xmin()) * width
-        left_wrist_y = (left_wrist.y() * bbox.height() + bbox.ymin()) * height
-        
-        right_wrist_x = (right_wrist.x() * bbox.width() + bbox.xmin()) * width
-        right_wrist_y = (right_wrist.y() * bbox.height() + bbox.ymin()) * height
-        
-        nose_y = (nose.y() * bbox.height() + bbox.ymin()) * height
-        
-        # Check if both wrists are above the nose (head level)
-        wrists_above_head = (left_wrist_y < nose_y) and (right_wrist_y < nose_y)
-        
-        # Check if wrists are crossed (left wrist to the right of right wrist)
-        wrists_crossed = left_wrist_x > right_wrist_x
-        
-        return wrists_above_head and wrists_crossed
-        
-    except Exception as e:
+        lw = points[KP["left_wrist"]]; rw = points[KP["right_wrist"]]; nz = points[KP["nose"]]
+        lwx = (lw.x()*bbox.width()+bbox.xmin())*W
+        lwy = (lw.y()*bbox.height()+bbox.ymin())*H
+        rwx = (rw.x()*bbox.width()+bbox.xmin())*W
+        rwy = (rw.y()*bbox.height()+bbox.ymin())*H
+        nzy = (nz.y()*bbox.height()+bbox.ymin())*H
+        return (lwy < nzy and rwy < nzy) and (lwx > rwx)
+    except Exception:
         return False
 
-# -----------------------------------------------------------------------------------------------
-# User-defined callback function
-# -----------------------------------------------------------------------------------------------
+# ----------------------------------------------------------
+#  GStreamer pad probe -------------------------------------
+# ----------------------------------------------------------
+def app_cb(pad, info, user: UserCB):
+    buf = info.get_buffer();  fmt,W,H = get_caps_from_pad(pad)
+    if buf is None or fmt is None: return Gst.PadProbeReturn.OK
+    frame = get_numpy_from_buffer(buf, fmt, W, H)
 
-def app_callback(pad, info, user_data):
-    # Get the GstBuffer from the probe info
-    buffer = info.get_buffer()
-    if buffer is None:
-        return Gst.PadProbeReturn.OK
+    # ---------- freeze-safe display while writing -----------
+    if user.saver and user.saver.is_alive() and not user.triggered:
+        bgr = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+        cv2.putText(bgr, "SAVING…", (60,60), cv2.FONT_HERSHEY_SIMPLEX, 1.5,(0,0,255),3)
+        user.set_frame(bgr);  return Gst.PadProbeReturn.OK
 
-    # Using the user_data to count the number of frames
-    user_data.increment()
+    # ---------- detection ----------------------------------
+    roi = hailo.get_roi_from_buffer(buf)
+    dets = roi.get_objects_typed(hailo.HAILO_DETECTION)
+    crossed_now = False
+    for d in dets:
+        if d.get_label()!="person": continue
+        lms = d.get_objects_typed(hailo.HAILO_LANDMARKS)
+        if lms and crossed(lms[0].get_points(), d.get_bbox(), W, H):
+            crossed_now = True
+            break
 
-    # Get the caps from the pad
-    format, width, height = get_caps_from_pad(pad)
-
-    # Get video frame
-    frame = None
-    if format is not None and width is not None and height is not None:
-        # Always get frame for buffer and display
-        user_data.use_frame = True
-        frame = get_numpy_from_buffer(buffer, format, width, height)
-        
-        # Store frame dimensions
-        if user_data.frame_dimensions is None:
-            user_data.frame_dimensions = (height, width)
-
-    # Skip detection if we're saving video to reduce CPU load
-    if user_data.save_in_progress:
-        if frame is not None:
-            # Just show basic info while saving
-            frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
-            cv2.putText(frame, "SAVING VIDEO - PLEASE WAIT...", (50, frame.shape[0]//2), 
-                       cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 0, 255), 3, cv2.LINE_AA)
-            user_data.set_frame(frame)
-        return Gst.PadProbeReturn.OK
-
-    # Get the detections from the buffer
-    roi = hailo.get_roi_from_buffer(buffer)
-    detections = roi.get_objects_typed(hailo.HAILO_DETECTION)
-
-    # Get the keypoints
-    keypoints = get_keypoints()
-
-    # Track if arms are crossed in this frame
-    arms_crossed_in_frame = False
-
-    # Parse the detections
-    for detection in detections:
-        label = detection.get_label()
-        bbox = detection.get_bbox()
-        confidence = detection.get_confidence()
-        
-        if label == "person":
-            # Get track ID
-            track_id = 0
-            track = detection.get_objects_typed(hailo.HAILO_UNIQUE_ID)
-            if len(track) == 1:
-                track_id = track[0].get_id()
-
-            # Pose estimation landmarks from detection
-            landmarks = detection.get_objects_typed(hailo.HAILO_LANDMARKS)
-            if len(landmarks) != 0:
-                points = landmarks[0].get_points()
-                
-                # Check if arms are crossed above head
-                if check_arms_crossed_above_head(points, bbox, width, height, keypoints):
-                    arms_crossed_in_frame = True
-                
-                # Draw keypoints
-                if frame is not None:
-                    # Draw key keypoints
-                    key_points = ['left_wrist', 'right_wrist', 'nose']
-                    for keypoint_name in key_points:
-                        keypoint_index = keypoints[keypoint_name]
-                        if keypoint_index < len(points):
-                            point = points[keypoint_index]
-                            x = int((point.x() * bbox.width() + bbox.xmin()) * width)
-                            y = int((point.y() * bbox.height() + bbox.ymin()) * height)
-                            
-                            # Different colors for different keypoints
-                            if 'wrist' in keypoint_name:
-                                color = (0, 255, 255)  # Yellow for wrists
-                            else:
-                                color = (255, 0, 0)  # Blue for nose
-                            
-                            cv2.circle(frame, (x, y), 5, color, -1)
-
-    # Update status and handle video saving
-    current_time = time.time()
-    
-    if arms_crossed_in_frame:
-        user_data.status_text = "Arms Crossed Above Head!"
-        
-        # Check if we should trigger video capture
-        if not user_data.arms_crossed_detected and not user_data.triggered and not user_data.save_in_progress:
-            user_data.arms_crossed_detected = True
-            
-            # Check cooldown period
-            if (user_data.last_arms_crossed_time is None or 
-                current_time - user_data.last_arms_crossed_time > user_data.cooldown_period):
-                
-                user_data.capture_trigger_time = current_time
-                user_data.triggered = True
-                user_data.frames_after_trigger = 0
-                user_data.total_detections += 1
-                print("\n*** Arms crossed detected! Capturing additional frames... ***")
-                
-                # Activate LED when arms are crossed
-                pulse_led(3.0)
+    t = time.time()
+    # ---------- event logic --------------------------------
+    if crossed_now:
+        user.status = "Arms Crossed!"
+        if not user.triggered and t - user.last_event > user.COOLDOWN_S:
+            user.triggered = True; user.after_count = 0; user.last_event = t; user.tot += 1
+            pulse_led(3); print("*** Arms crossed, start capture ***")
     else:
-        user_data.status_text = "Arms Not Crossed"
-        user_data.arms_crossed_detected = False
-    
-    # If we've triggered capture, continue capturing for a few more seconds
-    if user_data.triggered and not user_data.save_in_progress:
-        user_data.frames_after_trigger += 1
-        
-        # Check if we've captured enough frames after the trigger
-        if user_data.frames_after_trigger >= user_data.capture_extra_frames:
-            user_data.last_arms_crossed_time = current_time
-            print(f"\n*** Starting video save with {user_data.frames_after_trigger} frames after trigger ***")
-            user_data.save_buffer_to_video()
+        user.status = "Arms Not Crossed"
 
-    if frame is not None:
-        # Convert the frame to BGR
-        frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
-        
-        # Add status text to frame
-        font = cv2.FONT_HERSHEY_SIMPLEX
-        font_scale = 1
-        thickness = 2
-        
-        # Main status
-        color = (0, 0, 255) if "Crossed" in user_data.status_text and "Not" not in user_data.status_text else (0, 255, 0)
-        cv2.putText(frame, user_data.status_text, (10, 40), 
-                   font, font_scale, color, thickness, cv2.LINE_AA)
-        
-        # Buffer status
-        buffer_text = f"Buffer: {len(user_data.frame_buffer)}/{user_data.frame_buffer.maxlen} frames"
-        cv2.putText(frame, buffer_text, (10, 70), 
-                   font, 0.6, (255, 255, 255), 1, cv2.LINE_AA)
-        
-        # Capture status if triggered
-        if user_data.triggered:
-            capture_text = f"Capturing: {user_data.frames_after_trigger}/{user_data.capture_extra_frames} frames"
-            cv2.putText(frame, capture_text, (10, 100), 
-                       font, 0.6, (255, 255, 0), 1, cv2.LINE_AA)
-        
-        # Detection counter
-        counter_text = f"Total Detections: {user_data.total_detections}"
-        cv2.putText(frame, counter_text, (10, 130), 
-                   font, 0.6, (255, 255, 0), 1, cv2.LINE_AA)
-        
-        # Save status
-        if user_data.saving_video:
-            cv2.putText(frame, "SAVING VIDEO...", (frame.shape[1]//2 - 150, 80), 
-                       font, 1.2, (0, 0, 255), 3, cv2.LINE_AA)
-        
-        # Save folder info
-        folder_text = f"Save folder: {SAVE_FOLDER}"
-        cv2.putText(frame, folder_text, (10, frame.shape[0] - 20), 
-                   font, 0.5, (200, 200, 200), 1, cv2.LINE_AA)
-        
-        # Add frame to buffer (only if not saving)
-        if not user_data.save_in_progress:
-            user_data.add_frame_to_buffer(frame)
-        
-        # Set frame for display
-        user_data.set_frame(frame)
+    if user.triggered:
+        user.after_count += 1
+        if user.after_count >= user.AFTER_TRIGGER:
+            user.triggered = False
+            user.stop_q.put(True)        # tell saver to finish
+            print("*** capture done, writing file ***")
 
+    # ---------- buffer management ---------------------------
+    bgr = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+    cv2.putText(bgr, user.status, (10,40), cv2.FONT_HERSHEY_SIMPLEX,1,
+                (0,0,255) if "Crossed" in user.status else (0,255,0),2)
+    cv2.putText(bgr, f"Detections: {user.tot}", (10,75),
+                cv2.FONT_HERSHEY_SIMPLEX,0.6,(255,255,0),1)
+
+    # Save to buffer & feed saver
+    user.buf.append(bgr)
+    if user.triggered and user.after_count==1:
+        # first frame after trigger: launch saver & send 30 s history
+        if user.dim is None: user.dim = bgr.shape[:2]
+        h,w = user.dim
+        user._launch_saver(h,w)
+        for f in list(user.buf)[-UserCB.BUFFER:]:
+            user._feed_to_saver(f)
+    elif user.saver and user.saver.is_alive():
+        user._feed_to_saver(bgr)
+
+    user.set_frame(bgr)
     return Gst.PadProbeReturn.OK
 
-# -----------------------------------------------------------------------------------------------
-# Cleanup function for GPIO
-# -----------------------------------------------------------------------------------------------
-def cleanup_gpio():
-    """Clean up GPIO resources"""
-    if LED_AVAILABLE:
-        try:
-            led_line.set_value(0)  # Make sure LED is off
-            print("GPIO cleanup completed")
-        except:
-            pass
-
+# ----------------------------------------------------------
+#  Main -----------------------------------------------------
+# ----------------------------------------------------------
 if __name__ == "__main__":
+    Gst.init(None)
+    os.makedirs("gravacoes", exist_ok=True)
     try:
-        # Create an instance of the user app callback class
-        user_data = user_app_callback_class()
-        app = GStreamerPoseEstimationApp(app_callback, user_data)
-        
-        print("\n=== Pose Detection with Arms Crossed Detection ===")
-        print(f"Videos will be saved to: {os.path.abspath(SAVE_FOLDER)}")
-        print(f"GPIO17 LED control: {'Enabled' if LED_AVAILABLE else 'Disabled'}")
-        print("Detection: Arms crossed above head")
-        print("LED Duration: 3 seconds when detected")
-        print("Video: 30 seconds before + moment of crossing")
-        print("Press Ctrl+C to exit\n")
-        
+        user = UserCB()
+        app  = GStreamerPoseEstimationApp(app_cb, user)
+        print("Running. Ctrl-C to quit.")
         app.run()
-        
-    except KeyboardInterrupt:
-        print("\nShutting down...")
     finally:
-        cleanup_gpio()
+        if LED_OK: _led.set_value(0)
