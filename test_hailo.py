@@ -72,24 +72,23 @@ class user_app_callback_class(app_callback_class):
         fourcc = cv2.VideoWriter_fourcc(*"mp4v")
         writer = cv2.VideoWriter(filename, fourcc, FPS, (width, height))
 
-        # Annotate last frame
-        if self.frame_buffer:
-            last_frame = self.frame_buffer[-1]
-            cv2.putText(last_frame,
-                        "ARMS CROSSED",
+        total = len(self.frame_buffer)
+        # Annotate and write each frame
+        for idx, frame in enumerate(self.frame_buffer):
+            # Status: crossed only on the last frame, else not crossed
+            status = "ARMS CROSSED" if idx == total - 1 else "ARMS NOT CROSSED"
+            cv2.putText(frame,
+                        status,
                         (50, 100),
                         cv2.FONT_HERSHEY_SIMPLEX,
                         2.0,
                         (0, 255, 0),
                         4,
                         cv2.LINE_AA)
-            self.frame_buffer[-1] = last_frame
-
-        for f in self.frame_buffer:
-            writer.write(f)
+            writer.write(frame)
         writer.release()
 
-        print(f"[INFO] Saved clip: {filename}")
+        print(f"[INFO] Saved clip with overlay: {filename}")
         self.last_save_time = time.time()
         self.crossed = True
 
@@ -153,7 +152,7 @@ def app_callback(pad, info, user_data):
     if crossed_detected and not user_data.crossed and (now - user_data.last_save_time) > BUFFER_SECONDS:
         user_data.save_buffered_clip(width, height)
 
-    # Overlay status text
+    # Overlay status text on live frame
     if user_data.use_frame and frame is not None:
         status = "ARMS CROSSED" if crossed_detected else "ARMS NOT CROSSED"
         cv2.putText(frame,
@@ -174,5 +173,7 @@ def app_callback(pad, info, user_data):
 if __name__ == "__main__":
     Gst.init(None)
     user_data = user_app_callback_class()
+    # Enable OpenCV display of frames
+    user_data.use_frame = True
     app = GStreamerPoseEstimationApp(app_callback, user_data)
     app.run()
