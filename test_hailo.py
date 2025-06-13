@@ -59,6 +59,7 @@ class user_app_callback_class(app_callback_class):
         self.is_recording = False
         self.pose_start_time = None
         self._last_led_pulse_time = 0
+        self.pose_triggered_this_cycle = False # Flag to prevent re-triggering
         
         # --- FPS Calculation Attributes ---
         self._fps_last_time = time.time()
@@ -219,18 +220,25 @@ def app_callback(pad, info, user_data):
     if arms_crossed_detected:
         if user_data.pose_start_time is None:
             user_data.pose_start_time = time.time()
-        elif time.time() - user_data.pose_start_time >= POSE_DURATION_SECONDS:
-            if not user_data.is_recording:
+        # Check if pose is held and has not been triggered in this cycle
+        elif time.time() - user_data.pose_start_time >= POSE_DURATION_SECONDS and not user_data.pose_triggered_this_cycle:
+            if not user_data.is_recording and width > 0 and height > 0:
                 print("Arms crossed pose held. Triggering actions.")
                 user_data.pulse_led()
                 user_data.save_video_from_buffer(width, height, fps)
-                # Reset after triggering to prevent immediate re-trigger
-                user_data.pose_start_time = None 
+                # Set flag to prevent re-triggering until pose is broken
+                user_data.pose_triggered_this_cycle = True
+            elif user_data.is_recording:
+                print("Info: Pose detected, but a recording is already in progress.")
+            else:
+                print("Error: Pose detected, but video dimensions are invalid. Cannot save.")
+                
     else:
-        # If pose is no longer detected, reset the timer
+        # If pose is no longer detected, reset the timer and the trigger flag
         if user_data.pose_start_time is not None:
             print("Pose broken.")
             user_data.pose_start_time = None
+            user_data.pose_triggered_this_cycle = False # Re-arm trigger for the next time
             
     # Optional: Draw keypoints on the frame for visualization
     if frame is not None and user_data.use_frame:
