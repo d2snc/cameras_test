@@ -46,12 +46,6 @@ FILE_PREFIX = "arms_crossed_"
 POSE_CONFIDENCE_THRESHOLD = 0.5 # Confidence for keypoints
 POSE_DURATION_SECONDS = 0.8 # How long the pose must be held to trigger
 
-# --- Default Video Properties (fallback) ---
-DEFAULT_WIDTH = 1280
-DEFAULT_HEIGHT = 720
-DEFAULT_FORMAT = 'RGB'
-# ------------------------------------------
-
 if not os.path.exists(RECORDING_FOLDER):
     os.makedirs(RECORDING_FOLDER)
 
@@ -81,8 +75,9 @@ class user_app_callback_class(app_callback_class):
         self.caps_detected = False
         
         # Debug flags
-        self.debug_printed = False
+        self.debug_count = 0
         self.frame_count = 0
+        self.caps_printed = False
 
     def get_fps(self):
         """Calculates and returns the current FPS."""
@@ -154,6 +149,60 @@ class user_app_callback_class(app_callback_class):
             self.is_recording = False
 
 # -----------------------------------------------------------------------------------------------
+# Alternative frame extraction function
+# -----------------------------------------------------------------------------------------------
+def extract_frame_directly(buffer, width, height, format_str):
+    """Try to extract frame directly from buffer."""
+    try:
+        # Get buffer size and map it
+        success, map_info = buffer.map(Gst.MapFlags.READ)
+        if not success:
+            return None
+            
+        # Calculate expected size based on format
+        if format_str in ['RGB', 'BGR']:
+            expected_size = width * height * 3
+            channels = 3
+        elif format_str in ['RGBA', 'BGRA']:
+            expected_size = width * height * 4
+            channels = 4
+        elif format_str in ['GRAY8', 'GRAY16_LE', 'GRAY16_BE']:
+            expected_size = width * height
+            channels = 1
+        else:
+            # For YUV formats, size calculation is different
+            buffer.unmap(map_info)
+            return None
+            
+        # Check if buffer size matches
+        if len(map_info.data) < expected_size:
+            print(f"Buffer size mismatch: got {len(map_info.data)}, expected {expected_size}")
+            buffer.unmap(map_info)
+            return None
+            
+        # Create numpy array from buffer data
+        frame = np.frombuffer(map_info.data[:expected_size], dtype=np.uint8)
+        
+        if channels == 1:
+            frame = frame.reshape((height, width))
+        else:
+            frame = frame.reshape((height, width, channels))
+            
+        # Make a copy before unmapping
+        frame_copy = frame.copy()
+        buffer.unmap(map_info)
+        
+        return frame_copy
+        
+    except Exception as e:
+        print(f"Direct extraction failed: {e}")
+        try:
+            buffer.unmap(map_info)
+        except:
+            pass
+        return None
+
+# -----------------------------------------------------------------------------------------------
 # User-defined callback function
 # -----------------------------------------------------------------------------------------------
 def app_callback(pad, info, user_data):
@@ -164,7 +213,32 @@ def app_callback(pad, info, user_data):
     user_data.increment()
     user_data.frame_count += 1
     
-    # Try to get actual video properties from the pad
+    # Extensive debugging for first few frames
+    if user_data.debug_count < 5:
+        print(f"\n=== DEBUG Frame {user_data.debug_count} ===")
+        print(f"Buffer: {buffer}")
+        print(f"Buffer size: {buffer.get_size()}")
+        
+        # Try to get caps information
+        caps = get_caps_from_pad(pad)
+        if caps and not user_data.caps_printed:
+            print(f"Caps string: {caps.to_string()}")
+            user_data.caps_printed = True
+            
+            # Parse caps to get properties
+            structure = caps.get_structure(0)
+            print(f"Structure name: {structure.get_name()}")
+            print(f"Number of fields: {structure.n_fields()}")
+            
+            # Print all fields
+            for i in range(structure.n_fields()):
+                field_name = structure.nth_field_name(i)
+                field_value = structure.get_value(field_name)
+                print(f"  {field_name}: {field_value}")
+        
+        user_data.debug_count += 1
+    
+    # Try to get video properties
     if not user_data.caps_detected:
         try:
             caps = get_caps_from_pad(pad)
@@ -172,18 +246,31 @@ def app_callback(pad, info, user_data):
                 structure = caps.get_structure(0)
                 user_data.video_width = structure.get_value('width')
                 user_data.video_height = structure.get_value('height')
+                
+                # Try different ways to get format
                 format_string = structure.get_value('format')
-                user_data.video_format = format_string
+                if not format_string:
+                    # Check if it's under a different name
+                    struct_name = structure.get_name()
+                    if 'video/x-raw' in struct_name:
+                        # Try to extract format from structure
+                        for i in range(structure.n_fields()):
+                            field_name = structure.nth_field_name(i)
+                            if 'format' in field_name.lower():
+                                format_string = structure.get_value(field_name)
+                                break
+                
+                user_data.video_format = format_string if format_string else 'RGB'
                 user_data.caps_detected = True
-                print(f"Detected video properties: {user_data.video_width}x{user_data.video_height}, format: {format_string}")
+                print(f"\nDetected video properties: {user_data.video_width}x{user_data.video_height}, format: {user_data.video_format}")
         except Exception as e:
             print(f"Failed to get caps from pad: {e}")
             # Use fallback values
-            user_data.video_width = DEFAULT_WIDTH
-            user_data.video_height = DEFAULT_HEIGHT
-            user_data.video_format = DEFAULT_FORMAT
+            user_data.video_width = 1280
+            user_data.video_height = 720
+            user_data.video_format = 'RGB'
             user_data.caps_detected = True
-            print(f"Using default video properties: {DEFAULT_WIDTH}x{DEFAULT_HEIGHT}, format: {DEFAULT_FORMAT}")
+            print(f"Using fallback video properties: 1280x720, format: RGB")
     
     width = user_data.video_width
     height = user_data.video_height
@@ -194,40 +281,53 @@ def app_callback(pad, info, user_data):
 
     frame = None
     if user_data.use_frame:
+        # First, try the standard method
         try:
-            # Try with detected format first
             frame = get_numpy_from_buffer(buffer, format, width, height)
+            if frame is not None and user_data.debug_count <= 5:
+                print(f"SUCCESS: get_numpy_from_buffer worked with format '{format}'")
+        except Exception as e:
+            if user_data.debug_count <= 5:
+                print(f"Exception in get_numpy_from_buffer: {e}")
+        
+        # If standard method failed, try alternatives
+        if frame is None:
+            if user_data.debug_count <= 5:
+                print(f"Standard extraction failed. Trying alternatives...")
             
-            # If that fails, try common format variations
-            if frame is None and not user_data.debug_printed:
-                print(f"Failed to get frame with format '{format}'. Trying alternatives...")
-                for alt_format in ['RGB', 'BGR', 'RGBA', 'I420', 'NV12']:
+            # Try different format strings
+            format_alternatives = ['RGB', 'BGR', 'RGBA', 'BGRA', 'I420', 'YV12', 'NV12', 'NV21', 'YUY2', 'UYVY']
+            for alt_format in format_alternatives:
+                try:
                     frame = get_numpy_from_buffer(buffer, alt_format, width, height)
                     if frame is not None:
-                        print(f"Success with format '{alt_format}'!")
+                        print(f"SUCCESS: Format '{alt_format}' worked!")
                         user_data.video_format = alt_format
-                        format = alt_format
                         break
-                
-                if frame is None:
-                    print("ERROR: Could not extract frame from buffer with any format!")
-                user_data.debug_printed = True
+                except:
+                    pass
             
-            if frame is not None:
-                # Successfully got a frame - add to buffer
+            # If still no success, try direct extraction
+            if frame is None:
+                if user_data.debug_count <= 5:
+                    print("Trying direct buffer extraction...")
+                frame = extract_frame_directly(buffer, width, height, format)
+                if frame is not None:
+                    print("SUCCESS: Direct extraction worked!")
+        
+        # If we have a frame, add it to buffer
+        if frame is not None:
+            with user_data.buffer_lock:
+                user_data.frame_buffer.append(frame.copy())
+            
+            # Print buffer status periodically
+            if user_data.frame_count % 30 == 0:
                 with user_data.buffer_lock:
-                    user_data.frame_buffer.append(frame.copy())
-                
-                # Print buffer status periodically
-                if user_data.frame_count % 100 == 0:
-                    with user_data.buffer_lock:
-                        buffer_len = len(user_data.frame_buffer)
-                    print(f"Frame {user_data.frame_count}: Buffer has {buffer_len} frames")
-                    
-        except Exception as e:
-            if not user_data.debug_printed:
-                print(f"Exception getting numpy from buffer: {e}")
-                user_data.debug_printed = True
+                    buffer_len = len(user_data.frame_buffer)
+                print(f"Frame {user_data.frame_count}: Buffer has {buffer_len} frames")
+        else:
+            if user_data.debug_count <= 10:
+                print(f"WARNING: Frame {user_data.frame_count} - Could not extract frame!")
 
     # --- The rest of the logic remains the same ---
     roi = hailo.get_roi_from_buffer(buffer)
@@ -277,24 +377,18 @@ def app_callback(pad, info, user_data):
             user_data.pose_start_time = None
             user_data.pose_triggered_this_cycle = False
             
+    # Handle display
     if frame is not None and user_data.use_frame:
-        # Create a copy for display to avoid modifying the buffered frame
         display_frame = frame.copy()
         if arms_crossed_detected:
-             cv2.putText(display_frame, "ARMS CROSSED!", (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+            cv2.putText(display_frame, "ARMS CROSSED!", (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
         
-        # Check if frame needs color conversion for display
-        if format in ['RGB', 'RGBA']:
+        # Convert to BGR for display
+        if len(display_frame.shape) == 3 and display_frame.shape[2] == 3:
             bgr_frame = cv2.cvtColor(display_frame, cv2.COLOR_RGB2BGR)
-        elif format == 'BGR':
-            bgr_frame = display_frame
         else:
-            # For other formats, try to convert to BGR
-            try:
-                bgr_frame = cv2.cvtColor(display_frame, cv2.COLOR_RGB2BGR)
-            except:
-                bgr_frame = display_frame
-                
+            bgr_frame = display_frame
+            
         user_data.set_frame(bgr_frame)
         
     return Gst.PadProbeReturn.OK
