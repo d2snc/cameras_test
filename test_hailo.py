@@ -46,6 +46,12 @@ FILE_PREFIX = "arms_crossed_"
 POSE_CONFIDENCE_THRESHOLD = 0.5 # Confidence for keypoints
 POSE_DURATION_SECONDS = 0.8 # How long the pose must be held to trigger
 
+# --- Hardcoded Video Properties ---
+VIDEO_WIDTH = 1280
+VIDEO_HEIGHT = 720
+VIDEO_FORMAT = 'RGB'
+# ----------------------------------
+
 if not os.path.exists(RECORDING_FOLDER):
     os.makedirs(RECORDING_FOLDER)
 
@@ -58,19 +64,11 @@ class user_app_callback_class(app_callback_class):
         self.frame_buffer = deque()
         self.is_recording = False
         self.pose_start_time = None
-        self.pose_triggered_this_cycle = False # Flag to prevent re-triggering
+        self.pose_triggered_this_cycle = False
         
-        # --- Video Property Storage ---
-        self.width = 0
-        self.height = 0
-        self.format = None
-        # ------------------------------
-        
-        # --- FPS Calculation Attributes ---
         self._fps_last_time = time.time()
         self._fps_last_frame_count = 0
         self._fps = 0.0
-        # ----------------------------------
 
     def get_fps(self):
         """Calculates and returns the current FPS."""
@@ -81,10 +79,8 @@ class user_app_callback_class(app_callback_class):
         if elapsed_time >= 1.0:
             frames_since_last = total_frames - self._fps_last_frame_count
             self._fps = frames_since_last / elapsed_time
-            
             self._fps_last_time = current_time
             self._fps_last_frame_count = total_frames
-            
         return self._fps
 
     def update_buffer_size(self, fps):
@@ -98,8 +94,7 @@ class user_app_callback_class(app_callback_class):
 
     def pulse_led(self, duration=3.0):
         """Turns the LED on for a specified duration."""
-        if not LED_AVAILABLE:
-            return
+        if not LED_AVAILABLE: return
         print(f"Turning LED ON for {duration} seconds.")
         led_line.set_value(1)
         t = threading.Timer(duration, lambda: led_line.set_value(0))
@@ -111,18 +106,12 @@ class user_app_callback_class(app_callback_class):
         if self.is_recording or len(self.frame_buffer) == 0:
             if len(self.frame_buffer) == 0:
                 print("ERROR: Video not saved because the frame buffer is empty.")
-            if self.is_recording:
-                print("INFO: Video not saved because a recording is already in progress.")
             return
-
         self.is_recording = True
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = os.path.join(RECORDING_FOLDER, f"{FILE_PREFIX}{timestamp}.avi")
-        
         frames_to_save = list(self.frame_buffer)
-
         print(f"Starting video save to {filename} with {len(frames_to_save)} frames.")
-        
         thread = threading.Thread(target=self._write_video_file, args=(filename, frames_to_save, width, height, fps))
         thread.daemon = True
         thread.start()
@@ -130,26 +119,21 @@ class user_app_callback_class(app_callback_class):
     def _write_video_file(self, filename, frames, width, height, fps):
         """The actual video writing logic."""
         try:
-            # Use XVID codec for better compatibility (.avi)
             fourcc = cv2.VideoWriter_fourcc(*'XVID')
             save_fps = min(fps if fps > 0 else 30, 30)
             writer = cv2.VideoWriter(filename, fourcc, save_fps, (width, height))
-            
             if not writer.isOpened():
                 print(f"Error: Could not open video writer for {filename}")
                 self.is_recording = False
                 return
-
             for frame in frames:
                 writer.write(cv2.cvtColor(frame, cv2.COLOR_RGB2BGR))
-            
             writer.release()
             print(f"Successfully saved video: {filename}")
         except Exception as e:
             print(f"!!! FATAL ERROR during video writing: {e}")
         finally:
             self.is_recording = False
-
 
 # -----------------------------------------------------------------------------------------------
 # User-defined callback function
@@ -161,48 +145,29 @@ def app_callback(pad, info, user_data):
 
     user_data.increment()
     
-    # If we haven't stored the video dimensions yet, try to get them.
-    if user_data.width == 0:
-        format, width, height = get_caps_from_pad(pad)
-        if width and height and format:
-            print(f"INFO: Storing video properties - {width}x{height}, Format: {format}")
-            user_data.width = width
-            user_data.height = height
-            user_data.format = format
-
-    # Exit early if we still don't have video properties.
-    if user_data.width == 0:
-        return Gst.PadProbeReturn.OK
-
-    # Use stored properties from now on
-    width, height, format = user_data.width, user_data.height, user_data.format
+    # Use the hardcoded video properties
+    width, height, format = VIDEO_WIDTH, VIDEO_HEIGHT, VIDEO_FORMAT
     fps = user_data.get_fps()
-    
     user_data.update_buffer_size(fps)
 
     frame = None
     if user_data.use_frame:
-        # --- DIAGNOSTIC STEP ---
-        # Let's see exactly what we are passing to the library function.
-        print(f"DEBUG: Calling get_numpy_from_buffer with format='{format}', w={width}, h={height}")
+        # We call the library function with the known, correct parameters.
         frame = get_numpy_from_buffer(buffer, format, width, height)
         if frame is not None:
-            user_data.frame_buffer.append(frame)
-        # --- END DIAGNOSTIC ---
+            # We use .copy() to ensure we have our own version of the frame data.
+            user_data.frame_buffer.append(frame.copy())
 
-
+    # --- The rest of the logic remains the same ---
     roi = hailo.get_roi_from_buffer(buffer)
     detections = roi.get_objects_typed(hailo.HAILO_DETECTION)
-    
     keypoints_map = get_keypoints()
     arms_crossed_detected = False
 
     for detection in detections:
         if detection.get_label() == "person":
             landmarks = detection.get_objects_typed(hailo.HAILO_LANDMARKS)
-            if not landmarks:
-                continue
-
+            if not landmarks: continue
             points = landmarks[0].get_points()
             kpts = {}
             for name, index in keypoints_map.items():
@@ -213,16 +178,13 @@ def app_callback(pad, info, user_data):
                         int((point.x() * bbox.width() + bbox.xmin()) * width),
                         int((point.y() * bbox.height() + bbox.ymin()) * height)
                     )
-
             required_kpts = ['left_wrist', 'right_wrist', 'left_shoulder', 'right_shoulder', 'nose']
             if all(kpt in kpts for kpt in required_kpts):
                 lw, rw = kpts['left_wrist'], kpts['right_wrist']
                 ls, rs = kpts['left_shoulder'], kpts['right_shoulder']
                 ns = kpts['nose']
-
                 wrists_crossed = lw[0] > rs[0] and rw[0] < ls[0]
                 arms_above_head = lw[1] < ns[1] and rw[1] < ns[1]
-
                 if wrists_crossed and arms_above_head:
                     arms_crossed_detected = True
                     break
@@ -231,16 +193,11 @@ def app_callback(pad, info, user_data):
         if user_data.pose_start_time is None:
             user_data.pose_start_time = time.time()
         elif time.time() - user_data.pose_start_time >= POSE_DURATION_SECONDS and not user_data.pose_triggered_this_cycle:
-            if not user_data.is_recording and width > 0 and height > 0:
+            if not user_data.is_recording:
                 print("Arms crossed pose held. Triggering actions.")
                 user_data.pulse_led()
                 user_data.save_video_from_buffer(width, height, fps)
                 user_data.pose_triggered_this_cycle = True
-            elif user_data.is_recording:
-                print("Info: Pose detected, but a recording is already in progress.")
-            else:
-                print(f"Error: Pose detected, but video dimensions are invalid ({width}x{height}). Cannot save.")
-                
     else:
         if user_data.pose_start_time is not None:
             print("Pose broken.")
@@ -267,11 +224,8 @@ def get_keypoints():
 if __name__ == "__main__":
     user_data = user_app_callback_class()
     user_data.use_frame = True
-    
     app = GStreamerPoseEstimationApp(app_callback, user_data)
-    
     app.run()
-
     if LED_AVAILABLE:
         led_line.set_value(0)
         led_line.release()
