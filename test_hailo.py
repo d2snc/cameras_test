@@ -66,6 +66,10 @@ class user_app_callback_class(app_callback_class):
         self.pose_start_time = None
         self.pose_triggered_this_cycle = False
         
+        # --- Adopting the locking strategy from the working example ---
+        self.buffer_lock = threading.Lock()
+        # --------------------------------------------------------------
+        
         self._fps_last_time = time.time()
         self._fps_last_frame_count = 0
         self._fps = 0.0
@@ -87,10 +91,12 @@ class user_app_callback_class(app_callback_class):
         """Dynamically adjusts the buffer size based on FPS."""
         if fps > 0:
             max_len = int(fps * BUFFER_SECONDS)
-            if self.frame_buffer.maxlen != max_len:
-                current_frames = list(self.frame_buffer)
-                self.frame_buffer = deque(current_frames, maxlen=max_len)
-                print(f"Frame buffer resized to {max_len} frames for {fps:.1f} FPS.")
+            # Lock is not strictly necessary here as maxlen is atomic, but it's good practice
+            with self.buffer_lock:
+                if self.frame_buffer.maxlen != max_len:
+                    current_frames = list(self.frame_buffer)
+                    self.frame_buffer = deque(current_frames, maxlen=max_len)
+                    print(f"Frame buffer resized to {max_len} frames for {fps:.1f} FPS.")
 
     def pulse_led(self, duration=3.0):
         """Turns the LED on for a specified duration."""
@@ -103,14 +109,16 @@ class user_app_callback_class(app_callback_class):
 
     def save_video_from_buffer(self, width, height, fps):
         """Saves the buffered frames to a video file."""
-        if self.is_recording or len(self.frame_buffer) == 0:
-            if len(self.frame_buffer) == 0:
-                print("ERROR: Video not saved because the frame buffer is empty.")
-            return
-        self.is_recording = True
+        with self.buffer_lock:
+            if self.is_recording or len(self.frame_buffer) == 0:
+                if len(self.frame_buffer) == 0:
+                    print("ERROR: Video not saved because the frame buffer is empty.")
+                return
+            self.is_recording = True
+            frames_to_save = list(self.frame_buffer)
+
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = os.path.join(RECORDING_FOLDER, f"{FILE_PREFIX}{timestamp}.avi")
-        frames_to_save = list(self.frame_buffer)
         print(f"Starting video save to {filename} with {len(frames_to_save)} frames.")
         thread = threading.Thread(target=self._write_video_file, args=(filename, frames_to_save, width, height, fps))
         thread.daemon = True
@@ -155,8 +163,9 @@ def app_callback(pad, info, user_data):
         # We call the library function with the known, correct parameters.
         frame = get_numpy_from_buffer(buffer, format, width, height)
         if frame is not None:
-            # We use .copy() to ensure we have our own version of the frame data.
-            user_data.frame_buffer.append(frame.copy())
+            # We use a lock to protect buffer access, as in the working example.
+            with user_data.buffer_lock:
+                user_data.frame_buffer.append(frame.copy())
 
     # --- The rest of the logic remains the same ---
     roi = hailo.get_roi_from_buffer(buffer)
