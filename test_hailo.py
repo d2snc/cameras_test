@@ -1,118 +1,134 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Pose-estimation com detecção de “braços cruzados acima da cabeça”.
-• Buffer de 40 s  • Salva 30 s antes + 5 s depois do evento
-• Grava H.264 MP4 em processo separado (sem travar o pipeline)
-• LED (GPIO-17) pisca a cada 0,75 s enquanto o arquivo é escrito
-Douglas Lima – 2025-06-13
+Pose estimation + arms-crossed detector with non-blocking
+hardware-accelerated video recorder for Raspberry Pi.
+2025-06-13 rev.2
 """
-
-import gi, os, time, cv2, numpy as np, hailo, threading, multiprocessing as mp
+import gi
 gi.require_version("Gst", "1.0")
 from gi.repository import Gst, GLib
-
+import cv2, numpy as np, hailo, os, time, threading, multiprocessing as mp
 from collections import deque
 from datetime import datetime
-from queue import Full as QFull
-
-from hailo_apps_infra.hailo_rpi_common import (
-    get_caps_from_pad,
-    get_numpy_from_buffer,
-    app_callback_class,
-)
-from hailo_apps_infra.pose_estimation_pipeline import GStreamerPoseEstimationApp
-
-# ─────────────────────────── LED (GPIO-17) ───────────────────────────
+# ----------------------------------------------------------
+#  GPIO section identical to your original -----------------
+# ----------------------------------------------------------
 try:
     import gpiod
     _chip = gpiod.Chip("gpiochip0")
     _led  = _chip.get_line(17)
     _led.request(consumer="pose-led", type=gpiod.LINE_REQ_DIR_OUT, default_vals=[0])
     LED_OK = True
-    print("GPIO17 LED pronto")
 except Exception as e:
+    print("GPIO17 LED disabled:", e)
     LED_OK = False
-    print("GPIO17 LED desativado:", e)
 
-def pulse_led(dur=0.15):
-    if not LED_OK:
-        return
+def pulse_led(duration=3.0):
+    if not LED_OK: return
     _led.set_value(1)
-    threading.Timer(dur, lambda: _led.set_value(0), daemon=True).start()
+    threading.Timer(duration, lambda: _led.set_value(0), daemon=True).start()
 
-def _blink_led(stop_evt, on_ms=150, per_ms=750):
-    while not stop_evt.is_set():
-        pulse_led(on_ms / 1000)
-        stop_evt.wait(per_ms / 1000)
-
-# ──────────────────────── Pasta de gravações ─────────────────────────
-SAVE_DIR = "gravacoes"
-os.makedirs(SAVE_DIR, exist_ok=True)
-
-# ─────────────────────── Processo gravador MP4 ───────────────────────
-def _choose_encoder(fps):
-    """Escolhe o primeiro encoder H.264 disponível."""
-    for enc in ("v4l2h264enc", "omxh264enc", "x264enc"):
-        if Gst.ElementFactory.find(enc):
-            if enc == "v4l2h264enc":
-                return f'v4l2h264enc extra-controls="encode,frame_level_rate_control_enable=true" keyframe-period={fps*2}'
-            if enc == "omxh264enc":
-                return 'omxh264enc control-rate=variable target-bitrate=2000000'
-            return 'x264enc tune=zerolatency speed-preset=veryfast'
-    return None
-
-def saver_proc(f_q: mp.Queue, stop_evt: mp.Event, w, h, fps):
-    Gst.init(None)                         # precisa inicializar no filho
+# ----------------------------------------------------------
+#  Asynchronous saver process ------------------------------
+# ----------------------------------------------------------
+def saver_proc(frame_q: mp.Queue, stop_q: mp.Queue, w, h, fps):
+    """
+    Receives JPEG bytes on frame_q, writes an MP4 with hardware H.264.
+    Terminates when stop_q gets any message.
+    """
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-    fname = os.path.join(SAVE_DIR, f"arms_crossed_{ts}.mp4")
-    print(f"[Saver] gravando {fname}")
+    mp4_path = os.path.join("gravacoes", f"arms_crossed_{ts}.mp4")
+    print(f"[Saver] Starting file {mp4_path}")
 
-    enc_str = _choose_encoder(fps)
-    use_gst = False
-    if enc_str:
-        pipe = (
-            f"gst-launch-1.0 -q appsrc name=src is-live=true block=true "
-            f"format=3 do-timestamp=true ! jpegdec ! "
-            f"videoconvert ! video/x-raw,format=I420,width={w},height={h},framerate={fps}/1 ! "
-            f"{enc_str} ! h264parse ! mp4mux ! filesink location={fname}"
-        )
-        try:
-            import subprocess, shlex
-            gstp = subprocess.Popen(shlex.split(pipe), stdin=subprocess.PIPE)
-            use_gst = True
-        except Exception as e:
-            print("[Saver] Falha GStreamer, usando OpenCV:", e)
-
-    if not use_gst:
+    # ---------- Try GStreamer (fast, HW) ----------
+    gst_cmd = (
+        f"gst-launch-1.0 -q appsrc name=appsrc is-live=true block=true "
+        f"format=3 do-timestamp=true ! jpegdec ! "
+        f"videoconvert ! video/x-raw,format=I420,width={w},height={h},framerate={fps}/1 ! "
+        f"v4l2h264enc extra-controls=\"encode,frame_level_rate_control_enable=true\" "
+        f"keyframe-period={fps*2} ! h264parse ! mp4mux name=mux ! filesink location={mp4_path}"
+    )
+    try:
+        import subprocess, shlex
+        proc = subprocess.Popen(shlex.split(gst_cmd), stdin=subprocess.PIPE)
+        use_gst = True
+    except Exception as e:
+        print("[Saver] HW-encode unavailable, falling back to OpenCV:", e)
         fourcc = cv2.VideoWriter_fourcc(*"mp4v")
-        vw = cv2.VideoWriter(fname, fourcc, fps, (w, h))
+        vw = cv2.VideoWriter(mp4_path, fourcc, fps, (w, h))
+        use_gst = False
 
     frames = 0
-    while not (stop_evt.is_set() and f_q.empty()):
-        try:
-            jpeg = f_q.get(timeout=0.1)
-        except Exception:
-            continue
-        if use_gst:
-            gstp.stdin.write(jpeg)
-        else:
-            img = cv2.imdecode(np.frombuffer(jpeg, dtype=np.uint8), cv2.IMREAD_COLOR)
-            vw.write(img)
-        frames += 1
+    while True:
+        if not frame_q.empty():
+            jpeg_bytes = frame_q.get()
+            if jpeg_bytes is None:   # poison pill
+                break
+            if use_gst:
+                proc.stdin.write(jpeg_bytes)
+            else:
+                np_buf  = np.frombuffer(jpeg_bytes, dtype=np.uint8)
+                frame   = cv2.imdecode(np_buf, cv2.IMREAD_COLOR)
+                vw.write(frame)
+            frames += 1
+        elif not stop_q.empty():
+            # Main process says "we're done"; send poison pill when queue drained
+            frame_q.put(None)
+
+        time.sleep(0.001)
 
     if use_gst:
-        gstp.stdin.close()
-        gstp.wait()
+        proc.stdin.close()
+        proc.wait()
     else:
         vw.release()
-    print(f"[Saver] concluído – {frames} quadros salvos")
+    print(f"[Saver] Saved {frames} frames → {mp4_path}")
 
-# ─────────────────────── Utilidades de detecção ─────────────────────
-KP = {"nose": 0, "left_wrist": 9, "right_wrist": 10}
-def arms_crossed(points, bbox, W, H):
+# ----------------------------------------------------------
+#  Pose detection callback class ---------------------------
+# ----------------------------------------------------------
+class UserCB(app_callback_class):
+    FPS               = 30
+    BUFFER            = 1200             # ~40 s of 30 fps
+    AFTER_TRIGGER     = FPS * 5          # 5 s extra
+    COOLDOWN_S        = 5
+
+    def __init__(self):
+        super().__init__()
+        self.buf = deque(maxlen=self.BUFFER)
+        self.last_event   = 0.0
+        self.triggered    = False
+        self.after_count  = 0
+        self.saver: mp.Process|None = None
+        self.frame_q, self.stop_q  = None, None
+        self.status = "Arms Not Crossed"
+        self.tot = 0
+        self.dim = None
+
+    # -------------- helpers --------------
+    def _launch_saver(self, h, w):
+        self.frame_q = mp.Queue(maxsize=500)
+        self.stop_q  = mp.Queue()
+        self.saver   = mp.Process(target=saver_proc,
+                                  args=(self.frame_q, self.stop_q, w, h, self.FPS),
+                                  daemon=True)
+        self.saver.start()
+
+    def _feed_to_saver(self, frame):
+        # Compress once, share bytes
+        ok, jpg = cv2.imencode(".jpg", frame, [int(cv2.IMWRITE_JPEG_QUALITY), 85])
+        if ok and self.saver is not None:
+            self.frame_q.put(jpg.tobytes(), block=False)
+
+# ----------------------------------------------------------
+#  Helper: minimal keypoint set ----------------------------
+# ----------------------------------------------------------
+KP = {"nose":0,"left_wrist":9,"right_wrist":10}
+
+def crossed(points, bbox, W, H):
     try:
-        lw, rw, nz = (points[KP[k]] for k in ("left_wrist","right_wrist","nose"))
+        lw = points[KP["left_wrist"]]; rw = points[KP["right_wrist"]]; nz = points[KP["nose"]]
         lwx = (lw.x()*bbox.width()+bbox.xmin())*W
         lwy = (lw.y()*bbox.height()+bbox.ymin())*H
         rwx = (rw.x()*bbox.width()+bbox.xmin())*W
@@ -122,101 +138,80 @@ def arms_crossed(points, bbox, W, H):
     except Exception:
         return False
 
-# ───────────────────────── Classe de callback ───────────────────────
-class UserCB(app_callback_class):
-    FPS, PRE_S, POST_S = 30, 30, 5
-    COOLDOWN = 5
-    def __init__(self):
-        super().__init__()
-        self.buf = deque(maxlen=self.FPS*(self.PRE_S+self.POST_S+5))
-        self.trigger, self.after = False, 0
-        self.last_evt, self.total = 0.0, 0
-        self.dim = None
-        # gravador
-        self.f_q = self.stop_evt = self.saver = None
-        self.blink_evt = None
-        self.status = "Arms Not Crossed"
-
-    # ─────────── iniciar gravador ───────────
-    def _start_saver(self, h, w):
-        self.f_q = mp.Queue(maxsize=500)
-        self.stop_evt = mp.Event()
-        self.saver = mp.Process(target=saver_proc,
-                                args=(self.f_q, self.stop_evt, w, h, self.FPS),
-                                daemon=True)
-        self.saver.start()
-        # LED blink
-        self.blink_evt = threading.Event()
-        threading.Thread(target=_blink_led, args=(self.blink_evt,),
-                         daemon=True).start()
-
-    # ─────────── enviar quadro ──────────────
-    def _send(self, frame):
-        ok, jpg = cv2.imencode(".jpg", frame, [int(cv2.IMWRITE_JPEG_QUALITY),85])
-        if ok and self.saver and self.saver.is_alive():
-            try: self.f_q.put_nowait(jpg.tobytes())
-            except QFull: pass
-
-# ─────────────────────── Pad-probe da aplicação ─────────────────────
+# ----------------------------------------------------------
+#  GStreamer pad probe -------------------------------------
+# ----------------------------------------------------------
 def app_cb(pad, info, user: UserCB):
-    buf = info.get_buffer()
-    fmt,W,H = get_caps_from_pad(pad)
+    buf = info.get_buffer();  fmt,W,H = get_caps_from_pad(pad)
     if buf is None or fmt is None: return Gst.PadProbeReturn.OK
-    rgb = get_numpy_from_buffer(buf, fmt, W, H)
+    frame = get_numpy_from_buffer(buf, fmt, W, H)
 
-    # -------- detecção -----------------------
-    crossed_now = False
+    # ---------- freeze-safe display while writing -----------
+    if user.saver and user.saver.is_alive() and not user.triggered:
+        bgr = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+        cv2.putText(bgr, "SAVING…", (60,60), cv2.FONT_HERSHEY_SIMPLEX, 1.5,(0,0,255),3)
+        user.set_frame(bgr);  return Gst.PadProbeReturn.OK
+
+    # ---------- detection ----------------------------------
     roi = hailo.get_roi_from_buffer(buf)
-    for det in roi.get_objects_typed(hailo.HAILO_DETECTION):
-        if det.get_label()!="person": continue
-        lms = det.get_objects_typed(hailo.HAILO_LANDMARKS)
-        if lms and arms_crossed(lms[0].get_points(), det.get_bbox(), W, H):
-            crossed_now = True; break
+    dets = roi.get_objects_typed(hailo.HAILO_DETECTION)
+    crossed_now = False
+    for d in dets:
+        if d.get_label()!="person": continue
+        lms = d.get_objects_typed(hailo.HAILO_LANDMARKS)
+        if lms and crossed(lms[0].get_points(), d.get_bbox(), W, H):
+            crossed_now = True
+            break
 
     t = time.time()
+    # ---------- event logic --------------------------------
     if crossed_now:
         user.status = "Arms Crossed!"
-        if not user.trigger and t-user.last_evt>user.COOLDOWN:
-            user.trigger, user.after = True, 0
-            user.last_evt = t; user.total += 1
-            pulse_led(0.3)
-            print("*** braços cruzados – capturando ***")
+        if not user.triggered and t - user.last_event > user.COOLDOWN_S:
+            user.triggered = True; user.after_count = 0; user.last_event = t; user.tot += 1
+            pulse_led(3); print("*** Arms crossed, start capture ***")
     else:
         user.status = "Arms Not Crossed"
 
-    # pós-evento
-    if user.trigger:
-        user.after += 1
-        if user.after >= user.FPS*user.POST_S:
-            user.trigger = False
-            user.stop_evt.set()
-            if user.blink_evt: user.blink_evt.set()
-            print("*** captura concluída – salvando ***")
+    if user.triggered:
+        user.after_count += 1
+        if user.after_count >= user.AFTER_TRIGGER:
+            user.triggered = False
+            user.stop_q.put(True)        # tell saver to finish
+            print("*** capture done, writing file ***")
 
-    bgr = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
-    cv2.putText(bgr,user.status,(10,40),cv2.FONT_HERSHEY_SIMPLEX,1.1,
+    # ---------- buffer management ---------------------------
+    bgr = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+    cv2.putText(bgr, user.status, (10,40), cv2.FONT_HERSHEY_SIMPLEX,1,
                 (0,0,255) if "Crossed" in user.status else (0,255,0),2)
-    cv2.putText(bgr,f"Detections: {user.total}",(10,70),
+    cv2.putText(bgr, f"Detections: {user.tot}", (10,75),
                 cv2.FONT_HERSHEY_SIMPLEX,0.6,(255,255,0),1)
 
-    # buffer & gravação
+    # Save to buffer & feed saver
     user.buf.append(bgr)
-    if user.trigger and user.after==1 and not user.saver:
-        h,w = bgr.shape[:2]; user.dim=(h,w); user._start_saver(h,w)
-        for f in list(user.buf)[-user.FPS*user.PRE_S:]:
-            user._send(f)
+    if user.triggered and user.after_count==1:
+        # first frame after trigger: launch saver & send 30 s history
+        if user.dim is None: user.dim = bgr.shape[:2]
+        h,w = user.dim
+        user._launch_saver(h,w)
+        for f in list(user.buf)[-UserCB.BUFFER:]:
+            user._feed_to_saver(f)
     elif user.saver and user.saver.is_alive():
-        user._send(bgr)
+        user._feed_to_saver(bgr)
 
     user.set_frame(bgr)
     return Gst.PadProbeReturn.OK
 
-# ──────────────────────────── Main ────────────────────────────────
+# ----------------------------------------------------------
+#  Main -----------------------------------------------------
+# ----------------------------------------------------------
 if __name__ == "__main__":
     Gst.init(None)
-    print("Pose-detector ativo – Ctrl-C para sair")
+    os.makedirs("gravacoes", exist_ok=True)
     try:
-        app = GStreamerPoseEstimationApp(app_cb, UserCB())
+        user = UserCB()
+        app  = GStreamerPoseEstimationApp(app_cb, user)
+        print("Running. Ctrl-C to quit.")
         app.run()
     finally:
         if LED_OK: _led.set_value(0)
