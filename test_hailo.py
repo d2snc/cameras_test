@@ -104,7 +104,8 @@ def extract_rgb_frame_from_buffer(buffer, width=1280, height=720):
 class user_app_callback_class(app_callback_class):
     def __init__(self):
         super().__init__()
-        self.frame_buffer = deque()
+        initial_buffer_size = int(30 * BUFFER_SECONDS)  # Start with 30 FPS estimate
+        self.frame_buffer = deque(maxlen=initial_buffer_size)
         self.is_recording = False
         self.pose_start_time = None
         self.pose_triggered_this_cycle = False
@@ -113,6 +114,7 @@ class user_app_callback_class(app_callback_class):
         self.frames_captured = 0
         self.last_fps_time = time.time()
         self.fps = 30.0  # Default FPS
+        self.max_buffer_size = int(60 * BUFFER_SECONDS)  # Hard limit
         
     def update_fps(self):
         """Calculate current FPS."""
@@ -121,13 +123,16 @@ class user_app_callback_class(app_callback_class):
             self.fps = self.frame_count / (current_time - self.last_fps_time)
             self.frame_count = 0
             self.last_fps_time = current_time
-            # Update buffer size based on FPS
-            target_size = int(self.fps * BUFFER_SECONDS)
+            # Update buffer size based on FPS with safety limits
+            target_size = min(int(self.fps * BUFFER_SECONDS), self.max_buffer_size)
             if target_size > 0 and self.frame_buffer.maxlen != target_size:
                 with self.buffer_lock:
                     current_frames = list(self.frame_buffer)
+                    # Keep only the most recent frames if downsizing
+                    if len(current_frames) > target_size:
+                        current_frames = current_frames[-target_size:]
                     self.frame_buffer = deque(current_frames, maxlen=target_size)
-                print(f"Buffer resized for {self.fps:.1f} FPS: {target_size} frames max")
+                print(f"Buffer resized for {self.fps:.1f} FPS: {target_size} frames max (limit: {self.max_buffer_size})")
         return self.fps
         
     def pulse_led(self, duration=3.0):
@@ -225,12 +230,16 @@ def app_callback(pad, info, user_data):
     # Add frame to buffer if we got one
     if frame is not None:
         with user_data.buffer_lock:
+            # Safety check - don't add if buffer is at max capacity and maxlen isn't set
+            if user_data.frame_buffer.maxlen is None and len(user_data.frame_buffer) >= user_data.max_buffer_size:
+                user_data.frame_buffer.popleft()  # Remove oldest frame
             user_data.frame_buffer.append(frame.copy())
             user_data.frames_captured += 1
         
         if user_data.frame_count % 100 == 0:
             buffer_len = len(user_data.frame_buffer)
-            print(f"Frame {user_data.frame_count}: Buffer has {buffer_len} frames, FPS: {fps:.1f}")
+            buffer_max = user_data.frame_buffer.maxlen or "unlimited"
+            print(f"Frame {user_data.frame_count}: Buffer has {buffer_len}/{buffer_max} frames, FPS: {fps:.1f}")
     else:
         if user_data.frame_count <= 5:
             buffer_size = buffer.get_size()
