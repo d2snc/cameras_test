@@ -213,7 +213,7 @@ def app_callback(pad, info, user_data):
             frame = get_numpy_from_buffer(buffer, 'RGB', width, height)
             if frame is not None and user_data.frames_captured == 0:
                 print(f"Success: get_numpy_from_buffer worked!")
-        except:
+        except Exception:
             pass
     
     # Method 2: Direct extraction (this should work given your buffer size)
