@@ -9,6 +9,8 @@ import time
 import threading
 from collections import deque
 from datetime import datetime
+import gc  # Added missing import
+import psutil  # Added missing import
 
 from hailo_apps_infra.hailo_rpi_common import (
     get_caps_from_pad,
@@ -40,7 +42,7 @@ except Exception as e:
 # -----------------------------------------------------------------------------------------------
 # Recording Configuration
 # -----------------------------------------------------------------------------------------------
-BUFFER_SECONDS = 22
+BUFFER_SECONDS = 20  # Changed to 20 seconds as requested
 RECORDING_FOLDER = "recordings"
 FILE_PREFIX = "arms_crossed_"
 POSE_CONFIDENCE_THRESHOLD = 0.5
@@ -114,16 +116,16 @@ class user_app_callback_class(app_callback_class):
         self.frames_captured = 0
         self.last_fps_time = time.time()
         self.fps = 30.0  # Default FPS
-        self.max_buffer_size = int(60 * BUFFER_SECONDS)  # Hard limit
+        self.max_buffer_size = int(60 * BUFFER_SECONDS)  # FIXED: Allow up to 60fps * 20 seconds = 1200 frames
         
     def update_fps(self):
-        """Calculate current FPS."""
+        """Calculate current FPS and adjust buffer size."""
         current_time = time.time()
         if current_time - self.last_fps_time >= 1.0:
             self.fps = self.frame_count / (current_time - self.last_fps_time)
             self.frame_count = 0
             self.last_fps_time = current_time
-            # Update buffer size based on FPS with safety limits
+            # FIXED: Calculate buffer size for full BUFFER_SECONDS duration
             target_size = min(int(self.fps * BUFFER_SECONDS), self.max_buffer_size)
             if target_size > 0 and self.frame_buffer.maxlen != target_size:
                 with self.buffer_lock:
@@ -132,7 +134,7 @@ class user_app_callback_class(app_callback_class):
                     if len(current_frames) > target_size:
                         current_frames = current_frames[-target_size:]
                     self.frame_buffer = deque(current_frames, maxlen=target_size)
-                print(f"Buffer resized for {self.fps:.1f} FPS: {target_size} frames max (limit: {self.max_buffer_size})")
+                print(f"Buffer resized for {self.fps:.1f} FPS: {target_size} frames max ({BUFFER_SECONDS} seconds)")
         return self.fps
         
     def pulse_led(self, duration=3.0):
@@ -154,7 +156,7 @@ class user_app_callback_class(app_callback_class):
 
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = os.path.join(RECORDING_FOLDER, f"{FILE_PREFIX}{timestamp}.avi")
-        print(f"Saving {len(frames_to_save)} frames to {filename}")
+        print(f"Saving {len(frames_to_save)} frames to {filename} (approximately {len(frames_to_save)/fps:.1f} seconds)")
         
         thread = threading.Thread(target=self._write_video, args=(filename, frames_to_save, fps))
         thread.daemon = True
@@ -182,6 +184,10 @@ class user_app_callback_class(app_callback_class):
                     
             writer.release()
             print(f"Video saved successfully: {filename}")
+            
+            # Force garbage collection after saving
+            gc.collect()
+            
         except Exception as e:
             print(f"Error writing video: {e}")
             import traceback
@@ -319,12 +325,11 @@ def app_callback(pad, info, user_data):
             memory_mb = psutil.Process().memory_info().rss / 1024 / 1024
             print(f"DEBUG Frame {user_data.frame_count}: Buffer={buffer_size}, Memory={memory_mb:.1f}MB, FPS={fps:.1f}")
             
-            # Emergency stop if buffer is way too big
-            if buffer_size > 800:
-                print(f"EMERGENCY: Buffer too large ({buffer_size})! Clearing buffer...")
-                with user_data.buffer_lock:
-                    user_data.frame_buffer.clear()
-                    gc.collect()
+            # Emergency stop if buffer is way too big (adjusted for 20 seconds)
+            if buffer_size > user_data.max_buffer_size:
+                print(f"WARNING: Buffer at maximum capacity ({buffer_size}/{user_data.max_buffer_size})")
+                # Optionally force garbage collection
+                gc.collect()
         except Exception as e:
             print(f"Debug check error: {e}")
     
