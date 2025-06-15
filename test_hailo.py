@@ -312,6 +312,22 @@ def app_callback(pad, info, user_data):
         bgr_frame = cv2.cvtColor(display_frame, cv2.COLOR_RGB2BGR)
         user_data.set_frame(bgr_frame)
     
+    # Debug every 500 frames to catch issues early
+    if user_data.frame_count % 500 == 0 and user_data.frame_count > 0:
+        try:
+            buffer_size = len(user_data.frame_buffer)
+            memory_mb = psutil.Process().memory_info().rss / 1024 / 1024
+            print(f"DEBUG Frame {user_data.frame_count}: Buffer={buffer_size}, Memory={memory_mb:.1f}MB, FPS={fps:.1f}")
+            
+            # Emergency stop if buffer is way too big
+            if buffer_size > 800:
+                print(f"EMERGENCY: Buffer too large ({buffer_size})! Clearing buffer...")
+                with user_data.buffer_lock:
+                    user_data.frame_buffer.clear()
+                    gc.collect()
+        except Exception as e:
+            print(f"Debug check error: {e}")
+    
     return Gst.PadProbeReturn.OK
 
 # -----------------------------------------------------------------------------------------------
