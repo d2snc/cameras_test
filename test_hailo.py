@@ -48,6 +48,10 @@ FILE_PREFIX = "arms_crossed_"
 POSE_CONFIDENCE_THRESHOLD = 0.5
 POSE_DURATION_SECONDS = 0.8
 
+# Memory optimization settings
+BUFFER_FPS = 30  # Store 30 FPS in buffer for smooth video
+BUFFER_SCALE = 0.5  # Scale frames to 50% for buffer storage
+
 if not os.path.exists(RECORDING_FOLDER):
     os.makedirs(RECORDING_FOLDER)
 
@@ -106,8 +110,9 @@ def extract_rgb_frame_from_buffer(buffer, width=1280, height=720):
 class user_app_callback_class(app_callback_class):
     def __init__(self):
         super().__init__()
-        initial_buffer_size = int(30 * BUFFER_SECONDS)  # Start with 30 FPS estimate
-        self.frame_buffer = deque(maxlen=initial_buffer_size)
+        # Calculate max buffer size based on BUFFER_FPS instead of actual FPS
+        self.max_buffer_frames = BUFFER_FPS * BUFFER_SECONDS  # 30 * 20 = 600 frames max
+        self.frame_buffer = deque(maxlen=self.max_buffer_frames)
         self.is_recording = False
         self.pose_start_time = None
         self.pose_triggered_this_cycle = False
@@ -116,26 +121,30 @@ class user_app_callback_class(app_callback_class):
         self.frames_captured = 0
         self.last_fps_time = time.time()
         self.fps = 30.0  # Default FPS
-        self.max_buffer_size = int(60 * BUFFER_SECONDS)  # FIXED: Allow up to 60fps * 20 seconds = 1200 frames
+        self.last_buffer_frame_time = 0  # For frame skipping
+        self.frame_skip_interval = 1.0 / BUFFER_FPS  # Store frames at BUFFER_FPS rate
+        
+        # Memory monitoring
+        self.last_memory_check = time.time()
+        self.memory_warning_shown = False
         
     def update_fps(self):
-        """Calculate current FPS and adjust buffer size."""
+        """Calculate current FPS."""
         current_time = time.time()
         if current_time - self.last_fps_time >= 1.0:
             self.fps = self.frame_count / (current_time - self.last_fps_time)
             self.frame_count = 0
             self.last_fps_time = current_time
-            # FIXED: Calculate buffer size for full BUFFER_SECONDS duration
-            target_size = min(int(self.fps * BUFFER_SECONDS), self.max_buffer_size)
-            if target_size > 0 and self.frame_buffer.maxlen != target_size:
-                with self.buffer_lock:
-                    current_frames = list(self.frame_buffer)
-                    # Keep only the most recent frames if downsizing
-                    if len(current_frames) > target_size:
-                        current_frames = current_frames[-target_size:]
-                    self.frame_buffer = deque(current_frames, maxlen=target_size)
-                print(f"Buffer resized for {self.fps:.1f} FPS: {target_size} frames max ({BUFFER_SECONDS} seconds)")
+            print(f"Current FPS: {self.fps:.1f}, Buffer: {len(self.frame_buffer)}/{self.max_buffer_frames} frames")
         return self.fps
+        
+    def should_store_frame(self):
+        """Determine if current frame should be stored based on target buffer FPS."""
+        current_time = time.time()
+        if current_time - self.last_buffer_frame_time >= self.frame_skip_interval:
+            self.last_buffer_frame_time = current_time
+            return True
+        return False
         
     def pulse_led(self, duration=3.0):
         if not LED_AVAILABLE: return
@@ -152,35 +161,49 @@ class user_app_callback_class(app_callback_class):
                 return
             self.is_recording = True
             frames_to_save = list(self.frame_buffer)
-            fps = self.fps
 
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = os.path.join(RECORDING_FOLDER, f"{FILE_PREFIX}{timestamp}.avi")
-        print(f"Saving {len(frames_to_save)} frames to {filename} (approximately {len(frames_to_save)/fps:.1f} seconds)")
+        duration = len(frames_to_save) / BUFFER_FPS
+        print(f"Saving {len(frames_to_save)} frames to {filename} (approximately {duration:.1f} seconds)")
         
-        thread = threading.Thread(target=self._write_video, args=(filename, frames_to_save, fps))
+        thread = threading.Thread(target=self._write_video, args=(filename, frames_to_save))
         thread.daemon = True
         thread.start()
 
-    def _write_video(self, filename, frames, fps):
+    def _write_video(self, filename, frames):
         try:
             if not frames:
                 print("No frames to write!")
                 return
                 
+            # Get original dimensions from first frame
             h, w = frames[0].shape[:2]
+            
+            # Scale back to original size if needed
+            if BUFFER_SCALE < 1.0:
+                w = int(w / BUFFER_SCALE)
+                h = int(h / BUFFER_SCALE)
+            
             fourcc = cv2.VideoWriter_fourcc(*'XVID')
-            out_fps = min(fps, 30.0) if fps > 0 else 30.0
-            writer = cv2.VideoWriter(filename, fourcc, out_fps, (w, h))
+            writer = cv2.VideoWriter(filename, fourcc, BUFFER_FPS, (w, h))
             
             if not writer.isOpened():
                 print(f"Error: Could not open video writer")
                 return
                 
-            for frame in frames:
+            for i, frame in enumerate(frames):
+                # Scale frame back to original size if it was scaled down
+                if BUFFER_SCALE < 1.0:
+                    frame = cv2.resize(frame, (w, h), interpolation=cv2.INTER_LINEAR)
+                
                 # Convert RGB to BGR for OpenCV
                 bgr_frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
                 writer.write(bgr_frame)
+                
+                # Progress update
+                if i % 50 == 0:
+                    print(f"Writing frame {i}/{len(frames)}...")
                     
             writer.release()
             print(f"Video saved successfully: {filename}")
@@ -195,6 +218,36 @@ class user_app_callback_class(app_callback_class):
         finally:
             self.is_recording = False
 
+    def check_memory_usage(self):
+        """Monitor memory usage and warn if getting high."""
+        current_time = time.time()
+        if current_time - self.last_memory_check > 5.0:  # Check every 5 seconds
+            self.last_memory_check = current_time
+            try:
+                memory_mb = psutil.Process().memory_info().rss / 1024 / 1024
+                memory_percent = psutil.Process().memory_percent()
+                
+                if memory_percent > 70 and not self.memory_warning_shown:
+                    print(f"WARNING: High memory usage: {memory_mb:.1f}MB ({memory_percent:.1f}%)")
+                    self.memory_warning_shown = True
+                    
+                    # Emergency buffer clear if memory is critically high
+                    if memory_percent > 85:
+                        print("CRITICAL: Memory usage too high! Clearing oldest 25% of buffer...")
+                        with self.buffer_lock:
+                            # Keep only the most recent 75% of frames
+                            keep_size = int(len(self.frame_buffer) * 0.75)
+                            temp_frames = list(self.frame_buffer)[-keep_size:]
+                            self.frame_buffer.clear()
+                            self.frame_buffer.extend(temp_frames)
+                        gc.collect()
+                        
+                elif memory_percent < 60:
+                    self.memory_warning_shown = False
+                    
+            except Exception as e:
+                print(f"Memory check error: {e}")
+
 # -----------------------------------------------------------------------------------------------
 # Callback function
 # -----------------------------------------------------------------------------------------------
@@ -207,6 +260,9 @@ def app_callback(pad, info, user_data):
     user_data.frame_count += 1
     fps = user_data.update_fps()
     
+    # Check memory usage periodically
+    user_data.check_memory_usage()
+    
     # Get video properties
     width, height = 1280, 720
     caps_result = get_caps_from_pad(pad)
@@ -214,44 +270,51 @@ def app_callback(pad, info, user_data):
         format_str, width, height = caps_result
         if user_data.frame_count == 1:
             print(f"Video properties: {width}x{height}, format: {format_str}")
+            print(f"Buffer will store frames at {BUFFER_FPS} FPS, scaled to {BUFFER_SCALE*100}%")
     
-    # Extract frame - try Hailo method first, then direct extraction
+    # Only process frame extraction if we should store this frame
+    should_store = user_data.should_store_frame()
     frame = None
     
-    # Method 1: Try the Hailo library function
-    if frame is None:
+    if should_store:
+        # Extract frame - try Hailo method first, then direct extraction
+        # Method 1: Try the Hailo library function
         try:
             frame = get_numpy_from_buffer(buffer, 'RGB', width, height)
             if frame is not None and user_data.frames_captured == 0:
                 print(f"Success: get_numpy_from_buffer worked!")
         except Exception:
             pass
+        
+        # Method 2: Direct extraction
+        if frame is None:
+            frame = extract_rgb_frame_from_buffer(buffer, width, height)
+            if frame is not None and user_data.frames_captured == 0:
+                print(f"Success: Direct buffer extraction worked! Shape: {frame.shape}")
     
-    # Method 2: Direct extraction (this should work given your buffer size)
-    if frame is None:
-        frame = extract_rgb_frame_from_buffer(buffer, width, height)
-        if frame is not None and user_data.frames_captured == 0:
-            print(f"Success: Direct buffer extraction worked! Shape: {frame.shape}")
-    
-    # Add frame to buffer if we got one
-    if frame is not None:
+    # Add frame to buffer if we got one and should store it
+    if frame is not None and should_store:
+        # Scale down frame to save memory
+        if BUFFER_SCALE < 1.0:
+            scaled_height = int(height * BUFFER_SCALE)
+            scaled_width = int(width * BUFFER_SCALE)
+            scaled_frame = cv2.resize(frame, (scaled_width, scaled_height), interpolation=cv2.INTER_AREA)
+        else:
+            scaled_frame = frame
+            
         with user_data.buffer_lock:
-            # Safety check - don't add if buffer is at max capacity and maxlen isn't set
-            if user_data.frame_buffer.maxlen is None and len(user_data.frame_buffer) >= user_data.max_buffer_size:
-                user_data.frame_buffer.popleft()  # Remove oldest frame
-            user_data.frame_buffer.append(frame.copy())
+            user_data.frame_buffer.append(scaled_frame.copy())
             user_data.frames_captured += 1
         
-        if user_data.frame_count % 100 == 0:
+        if user_data.frames_captured % 50 == 0:
             buffer_len = len(user_data.frame_buffer)
-            buffer_max = user_data.frame_buffer.maxlen or "unlimited"
-            print(f"Frame {user_data.frame_count}: Buffer has {buffer_len}/{buffer_max} frames, FPS: {fps:.1f}")
-    else:
-        if user_data.frame_count <= 5:
-            buffer_size = buffer.get_size()
-            print(f"Frame {user_data.frame_count}: Failed to extract. Buffer size: {buffer_size}")
+            try:
+                memory_mb = psutil.Process().memory_info().rss / 1024 / 1024
+                print(f"Buffer: {buffer_len}/{user_data.max_buffer_frames} frames, Memory: {memory_mb:.1f}MB")
+            except:
+                print(f"Buffer: {buffer_len}/{user_data.max_buffer_frames} frames")
     
-    # Process pose detection
+    # Process pose detection (always do this, not just when storing frames)
     roi = hailo.get_roi_from_buffer(buffer)
     detections = roi.get_objects_typed(hailo.HAILO_DETECTION)
     arms_crossed_detected = False
@@ -307,31 +370,24 @@ def app_callback(pad, info, user_data):
             user_data.pose_start_time = None
             user_data.pose_triggered_this_cycle = False
     
-    # Display handling
-    if frame is not None and user_data.use_frame:
-        display_frame = frame.copy()
-        if arms_crossed_detected:
-            cv2.putText(display_frame, "ARMS CROSSED!", (50, 50), 
-                       cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+    # Display handling - use original frame or get new one if needed
+    if user_data.use_frame:
+        display_frame = frame
+        if display_frame is None and arms_crossed_detected:
+            # Need to extract frame for display
+            try:
+                display_frame = get_numpy_from_buffer(buffer, 'RGB', width, height)
+            except:
+                display_frame = extract_rgb_frame_from_buffer(buffer, width, height)
         
-        # Convert to BGR for display
-        bgr_frame = cv2.cvtColor(display_frame, cv2.COLOR_RGB2BGR)
-        user_data.set_frame(bgr_frame)
-    
-    # Debug every 500 frames to catch issues early
-    if user_data.frame_count % 500 == 0 and user_data.frame_count > 0:
-        try:
-            buffer_size = len(user_data.frame_buffer)
-            memory_mb = psutil.Process().memory_info().rss / 1024 / 1024
-            print(f"DEBUG Frame {user_data.frame_count}: Buffer={buffer_size}, Memory={memory_mb:.1f}MB, FPS={fps:.1f}")
+        if display_frame is not None:
+            if arms_crossed_detected:
+                cv2.putText(display_frame, "ARMS CROSSED!", (50, 50), 
+                           cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
             
-            # Emergency stop if buffer is way too big (adjusted for 20 seconds)
-            if buffer_size > user_data.max_buffer_size:
-                print(f"WARNING: Buffer at maximum capacity ({buffer_size}/{user_data.max_buffer_size})")
-                # Optionally force garbage collection
-                gc.collect()
-        except Exception as e:
-            print(f"Debug check error: {e}")
+            # Convert to BGR for display
+            bgr_frame = cv2.cvtColor(display_frame, cv2.COLOR_RGB2BGR)
+            user_data.set_frame(bgr_frame)
     
     return Gst.PadProbeReturn.OK
 
@@ -346,9 +402,18 @@ if __name__ == "__main__":
     user_data.use_frame = True
     
     print("Starting Hailo pose detection app...")
-    print(f"Buffer will hold up to {BUFFER_SECONDS} seconds of video")
+    print(f"Buffer will hold up to {BUFFER_SECONDS} seconds of video at {BUFFER_FPS} FPS")
+    print(f"Frames will be scaled to {BUFFER_SCALE*100}% to save memory")
+    print(f"Maximum buffer size: {user_data.max_buffer_frames} frames")
+    print(f"Estimated memory usage: ~{(user_data.max_buffer_frames * 640 * 360 * 3) / (1024*1024):.0f}MB")
     print(f"Pose must be held for {POSE_DURATION_SECONDS} seconds to trigger recording")
     print("Cross your arms above your head to trigger recording!")
+    
+    try:
+        memory_mb = psutil.Process().memory_info().rss / 1024 / 1024
+        print(f"Initial memory usage: {memory_mb:.1f}MB")
+    except:
+        pass
     
     app = GStreamerPoseEstimationApp(app_callback, user_data)
     app.run()
