@@ -1,206 +1,158 @@
 #!/usr/bin/env python3
 """
-Script para testar a instalação e funcionamento do Hailo 8L
+Script de teste para fazer uma inferência básica no Hailo
 """
 
-import sys
 import numpy as np
+from hailo_platform import HEF, VDevice, ConfigureParams, HailoStreamInterface
 
-def test_hailo_import():
-    """Testa se os módulos Hailo podem ser importados"""
-    print("1. Testando importação dos módulos Hailo...")
+def test_basic_inference(hef_path):
+    """Testa inferência básica com o Hailo"""
+    print("=== Teste de Inferência Básica ===\n")
+    
     try:
-        from hailo_platform import Device, HEF, VDevice
-        print("✓ Módulos Hailo importados com sucesso")
-        return True
-    except ImportError as e:
-        print(f"✗ Erro ao importar módulos Hailo: {e}")
-        print("\nDica: Verifique se o HailoRT está instalado corretamente")
-        print("Execute: pip install hailo_platform")
-        return False
-
-def test_device_detection():
-    """Testa se o dispositivo Hailo é detectado"""
-    print("\n2. Procurando dispositivos Hailo...")
-    try:
-        from hailo_platform import Device
-        
-        # Tentar diferentes métodos de detecção
-        devices = []
-        
-        # Método 1: PCIe scan
-        try:
-            pcie_devices = Device.scan_pcie()
-            devices.extend(pcie_devices)
-            print(f"✓ Dispositivos PCIe encontrados: {len(pcie_devices)}")
-        except:
-            print("- Nenhum dispositivo PCIe encontrado")
-        
-        # Método 2: Scan geral
-        try:
-            all_devices = Device.scan()
-            devices.extend(all_devices)
-            print(f"✓ Total de dispositivos encontrados: {len(all_devices)}")
-        except:
-            pass
-        
-        if devices:
-            print("\nDispositivos Hailo detectados:")
-            for i, device in enumerate(devices):
-                print(f"  Dispositivo {i}: {device}")
-            return True
-        else:
-            print("✗ Nenhum dispositivo Hailo encontrado")
-            print("\nDicas:")
-            print("1. Verifique se o Hailo 8L está instalado corretamente")
-            print("2. Execute: lspci | grep Hailo")
-            print("3. Reinicie o Raspberry Pi se necessário")
-            return False
-            
-    except Exception as e:
-        print(f"✗ Erro ao procurar dispositivos: {e}")
-        return False
-
-def test_hef_loading(hef_path):
-    """Testa o carregamento do arquivo HEF"""
-    print(f"\n3. Testando carregamento do HEF: {hef_path}")
-    try:
-        from hailo_platform import HEF
-        
+        # 1. Carregar HEF
+        print("1. Carregando HEF...")
         hef = HEF(hef_path)
-        print("✓ Arquivo HEF carregado com sucesso")
+        print("✓ HEF carregado")
         
-        # Obter informações do modelo
-        print("\nInformações do modelo:")
-        print(f"  Redes: {hef.get_network_group_names()}")
+        # 2. Obter informações
+        network_names = hef.get_network_group_names()
+        print(f"\n2. Redes: {network_names}")
         
-        # Informações de entrada
         input_infos = hef.get_input_vstream_infos()
-        print(f"\n  Entradas ({len(input_infos)}):")
-        for info in input_infos:
-            print(f"    - {info.name}: {info.shape}")
-        
-        # Informações de saída
         output_infos = hef.get_output_vstream_infos()
-        print(f"\n  Saídas ({len(output_infos)}):")
-        for info in output_infos:
-            print(f"    - {info.name}: {info.shape}")
+        
+        print(f"\nEntrada:")
+        for info in input_infos:
+            print(f"  - {info.name}: {info.shape}")
             
-        return True
+        print(f"\nSaídas ({len(output_infos)}):")
+        for i, info in enumerate(output_infos):
+            print(f"  {i}: {info.name}: {info.shape}")
+            
+        # 3. Criar dados de teste
+        print("\n3. Criando dados de teste...")
+        input_shape = input_infos[0].shape
+        # Criar imagem aleatória RGB
+        test_image = np.random.randint(0, 255, size=(input_shape[0], input_shape[1], input_shape[2]), dtype=np.uint8)
+        print(f"✓ Imagem de teste criada: {test_image.shape}")
         
-    except FileNotFoundError:
-        print(f"✗ Arquivo não encontrado: {hef_path}")
-        return False
-    except Exception as e:
-        print(f"✗ Erro ao carregar HEF: {e}")
-        return False
-
-def test_inference_setup(hef_path):
-    """Testa a configuração para inferência"""
-    print(f"\n4. Testando configuração de inferência...")
-    try:
-        from hailo_platform import (
-            Device, HEF, VDevice, 
-            HailoStreamInterface, ConfigureParams
-        )
-        
-        # Carregar HEF
-        hef = HEF(hef_path)
-        
-        # Criar VDevice
+        # 4. Criar VDevice
+        print("\n4. Criando VDevice...")
         params = VDevice.create_params()
         params.device_count = 1
         
         with VDevice(params) as vdevice:
-            print("✓ VDevice criado com sucesso")
+            print("✓ VDevice criado")
             
-            # Configurar
+            # 5. Configurar
+            print("\n5. Configurando rede...")
             configure_params = ConfigureParams.create_from_hef(
-                hef=hef,
+                hef, 
                 interface=HailoStreamInterface.PCIe
             )
             
-            network_name = hef.get_network_group_names()[0]
-            configured = vdevice.configure(hef, configure_params)
+            # Configure
+            network_group = vdevice.configure(hef, configure_params)
+            print(f"✓ Configurado. Tipo retornado: {type(network_group)}")
             
-            print(f"✓ Rede '{network_name}' configurada com sucesso")
+            # Se for dicionário, pegar o primeiro network group
+            if isinstance(network_group, dict):
+                network_name = list(network_group.keys())[0]
+                network_group = network_group[network_name]
+                print(f"✓ Usando network group: {network_name}")
             
-            # Testar ativação
-            network_group = configured[network_name]
-            with network_group.activate():
-                print("✓ Rede ativada com sucesso")
+            # 6. Criar bindings
+            print("\n6. Criando bindings...")
+            bindings = network_group.create_bindings()
+            print("✓ Bindings criados")
             
+            # 7. Configurar entrada
+            print("\n7. Configurando buffers...")
+            input_name = input_infos[0].name
+            bindings.input(input_name).set_buffer(test_image)
+            print(f"✓ Buffer de entrada configurado: {input_name}")
+            
+            # 8. Configurar saídas
+            output_buffers = {}
+            for i, output_info in enumerate(output_infos):
+                shape = list(output_info.shape)
+                buffer = np.empty(shape, dtype=np.float32)
+                bindings.output(output_info.name).set_buffer(buffer)
+                output_buffers[output_info.name] = buffer
+                print(f"✓ Buffer de saída {i} configurado: {output_info.name}")
+                
+            # 9. Executar inferência
+            print("\n8. Executando inferência...")
+            with network_group.activate(bindings):
+                job = network_group.run_async(bindings, None)
+                status = job.wait(5000)  # 5 segundos timeout
+                print(f"✓ Inferência completa. Status: {status}")
+                
+            # 10. Verificar resultados
+            print("\n9. Resultados:")
+            for name, buffer in output_buffers.items():
+                print(f"  - {name}: shape={buffer.shape}, min={buffer.min():.3f}, max={buffer.max():.3f}, mean={buffer.mean():.3f}")
+                
+        print("\n✓ Teste completo com sucesso!")
         return True
         
     except Exception as e:
-        print(f"✗ Erro na configuração: {e}")
-        print(f"\nDetalhes: {type(e).__name__}")
+        print(f"\n✗ Erro: {e}")
         import traceback
         traceback.print_exc()
         return False
 
-def test_camera():
-    """Testa a PiCamera2"""
-    print("\n5. Testando câmera...")
+def test_simple_activation(hef_path):
+    """Teste ainda mais simples"""
+    print("\n=== Teste Simples de Ativação ===\n")
+    
     try:
-        from picamera2 import Picamera2
+        hef = HEF(hef_path)
         
-        camera = Picamera2()
-        config = camera.create_preview_configuration(
-            main={"size": (640, 640), "format": "RGB888"}
-        )
-        camera.configure(config)
-        camera.start()
+        # Parâmetros mínimos
+        vdevice_params = VDevice.create_params()
+        vdevice_params.device_count = 1
         
-        # Capturar um frame de teste
-        frame = camera.capture_array()
-        camera.stop()
+        # Criar VDevice
+        vdevice = VDevice(vdevice_params)
+        print("✓ VDevice criado")
         
-        print(f"✓ Câmera funcionando: frame capturado {frame.shape}")
+        # Configurar
+        params = ConfigureParams.create_from_hef(hef, interface=HailoStreamInterface.PCIe)
+        network_groups = vdevice.configure(hef, params)
+        print(f"✓ Configurado. Tipo: {type(network_groups)}")
+        
+        # Listar conteúdo
+        if isinstance(network_groups, dict):
+            print(f"  Chaves: {list(network_groups.keys())}")
+        elif hasattr(network_groups, '__len__'):
+            print(f"  Tamanho: {len(network_groups)}")
+        
+        # Limpar
+        vdevice.release()
+        print("✓ VDevice liberado")
+        
         return True
         
     except Exception as e:
-        print(f"✗ Erro com a câmera: {e}")
-        print("\nDica: Execute 'sudo raspi-config' e ative a câmera")
+        print(f"✗ Erro: {e}")
         return False
 
-def main():
-    """Executa todos os testes"""
-    print("=== Teste de Configuração Hailo 8L ===\n")
-    
-    # Verificar argumentos
-    hef_path = "yolov8s_pose.hef"
-    if len(sys.argv) > 1:
-        hef_path = sys.argv[1]
-    
-    # Executar testes
-    tests = [
-        ("Importação", test_hailo_import()),
-    ]
-    
-    if tests[0][1]:  # Se importação funcionou
-        tests.extend([
-            ("Detecção de dispositivo", test_device_detection()),
-            ("Carregamento HEF", test_hef_loading(hef_path)),
-            ("Configuração de inferência", test_inference_setup(hef_path)),
-            ("Câmera", test_camera()),
-        ])
-    
-    # Resumo
-    print("\n=== Resumo dos Testes ===")
-    passed = sum(1 for _, result in tests if result)
-    total = len(tests)
-    
-    for name, result in tests:
-        status = "✓ Passou" if result else "✗ Falhou"
-        print(f"{name}: {status}")
-    
-    print(f"\nTotal: {passed}/{total} testes passaram")
-    
-    if passed == total:
-        print("\n✓ Sistema pronto para uso!")
-    else:
-        print("\n✗ Alguns problemas foram encontrados. Verifique os erros acima.")
-
 if __name__ == "__main__":
-    main()
+    import sys
+    
+    if len(sys.argv) < 2:
+        print("Uso: python3 test_inference.py <arquivo.hef>")
+        sys.exit(1)
+        
+    hef_path = sys.argv[1]
+    
+    # Teste simples primeiro
+    if test_simple_activation(hef_path):
+        print("\n" + "="*50 + "\n")
+        # Teste completo
+        test_basic_inference(hef_path)
+    else:
+        print("\nTeste simples falhou. Verifique a instalação do Hailo.")
