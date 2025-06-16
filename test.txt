@@ -1,0 +1,52 @@
+=== Teste de Configuração Hailo 8L ===
+
+1. Testando importação dos módulos Hailo...
+✓ Módulos Hailo importados com sucesso
+
+2. Procurando dispositivos Hailo...
+- Nenhum dispositivo PCIe encontrado
+✓ Total de dispositivos encontrados: 1
+
+Dispositivos Hailo detectados:
+  Dispositivo 0: 0001:01:00.0
+
+3. Testando carregamento do HEF: yolov8s_pose.hef
+✓ Arquivo HEF carregado com sucesso
+
+Informações do modelo:
+  Redes: ['yolov8s_pose']
+
+  Entradas (1):
+    - yolov8s_pose/input_layer1: (640, 640, 3)
+
+  Saídas (9):
+    - yolov8s_pose/conv70: (20, 20, 64)
+    - yolov8s_pose/conv71: (20, 20, 1)
+    - yolov8s_pose/conv72: (20, 20, 51)
+    - yolov8s_pose/conv57: (40, 40, 64)
+    - yolov8s_pose/conv58: (40, 40, 1)
+    - yolov8s_pose/conv59: (40, 40, 51)
+    - yolov8s_pose/conv43: (80, 80, 64)
+    - yolov8s_pose/conv44: (80, 80, 1)
+    - yolov8s_pose/conv45: (80, 80, 51)
+
+4. Testando configuração de inferência...
+✓ VDevice criado com sucesso
+✓ Rede 'yolov8s_pose' configurada com sucesso
+✗ Erro na configuração: list indices must be integers or slices, not str
+
+Detalhes: TypeError
+
+5. Testando câmera...
+✓ Câmera funcionando: frame capturado (640, 640, 3)
+
+=== Resumo dos Testes ===
+Importação: ✓ Passou
+Detecção de dispositivo: ✓ Passou
+Carregamento HEF: ✓ Passou
+Configuração de inferência: ✗ Falhou
+Câmera: ✓ Passou
+
+Total: 4/5 testes passaram
+
+✗ Alguns problemas foram encontrados. Verifique os erros acima.
