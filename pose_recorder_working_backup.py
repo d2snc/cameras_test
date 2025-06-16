@@ -19,7 +19,7 @@ from picamera2.devices import Hailo
 
 # --- Configuração Inicial ---
 
-# Configura o pino do LED usando gpiozero. O número 17 refere-se ao pino BCM 17.
+# Configura o pino do LED usando gpiozero.
 led = LED(17)
 
 # Analisador de argumentos para especificar o caminho do modelo
@@ -38,26 +38,46 @@ JOINT_PAIRS = [
     [R_SHOULDER, R_HIP], [L_HIP, R_HIP]
 ]
 
+# --- PARÂMETROS DE DETECÇÃO AJUSTÁVEIS ---
+# Número de frames consecutivos que a pose deve ser detectada para acionar a gravação.
+# Aumente este valor para exigir que a pose seja mantida por mais tempo.
+POSE_TRIGGER_FRAMES = 5 
+pose_detected_counter = 0 # Contador para a estabilização da pose
+
 # Variáveis globais
 last_predictions = None
 recording = False
 
 # --- Funções Principais ---
 
-def check_arms_crossed_above_head(keypoints, joint_scores, threshold=0.5):
-    """Verifica se a pose 'braços cruzados acima da cabeça' foi detectada."""
-    if all(joint_scores[i] > threshold for i in [L_WRIST, R_WRIST, L_SHOULDER, R_SHOULDER, NOSE]):
-        left_wrist_y, right_wrist_y = keypoints[L_WRIST][1], keypoints[R_WRIST][1]
-        left_shoulder_y, right_shoulder_y = keypoints[L_SHOULDER][1], keypoints[R_SHOULDER][1]
-        nose_y = keypoints[NOSE][1]
-        if left_wrist_y < nose_y and right_wrist_y < nose_y and \
-           left_wrist_y < (left_shoulder_y + right_shoulder_y) / 2 and \
-           right_wrist_y < (left_shoulder_y + right_shoulder_y) / 2:
-            return True
-    return False
+def check_arms_crossed_above_head(keypoints, joint_scores, threshold=0.6):
+    """
+    LÓGICA REFINADA E FINAL: Verifica se os braços estão cruzados acima da cabeça
+    usando o nariz como ponto de referência central.
+    """
+    # Pontos-chave essenciais para esta verificação precisa
+    required_indices = [L_WRIST, R_WRIST, NOSE]
+    
+    # 1. Garante que os pontos-chave essenciais tenham alta confiança
+    if not all(joint_scores[i] > threshold for i in required_indices):
+        return False
 
+    # 2. Extrai as coordenadas necessárias
+    left_wrist_x, left_wrist_y = keypoints[L_WRIST]
+    right_wrist_x, right_wrist_y = keypoints[R_WRIST]
+    nose_x, nose_y = keypoints[NOSE]
+
+    # 3. Condição de Altura: Ambos os pulsos devem estar ACIMA do nariz
+    arms_are_up = (left_wrist_y < nose_y) and (right_wrist_y < nose_y)
+
+    # 4. Condição de Cruzamento: Pulsos devem ter cruzado a linha vertical do nariz
+    arms_are_crossed = (left_wrist_x > nose_x) and (right_wrist_x < nose_x)
+
+    # 5. Retorna verdadeiro apenas se AMBAS as condições forem satisfeitas
+    return arms_are_up and arms_are_crossed
+
+# (As funções visualize_pose_estimation_result e draw_predictions permanecem inalteradas)
 def visualize_pose_estimation_result(results, image, model_size, detection_threshold=0.5, joint_threshold=0.5):
-    """Desenha os resultados da detecção de pose na imagem."""
     image_size = (image.shape[1], image.shape[0])
     def scale_coord(coord):
         return tuple([int(c * t / f) for c, f, t in zip(coord, model_size, image_size)])
@@ -78,10 +98,10 @@ def visualize_pose_estimation_result(results, image, model_size, detection_thres
                 cv2.line(image, p1, p2, (255, 0, 255), 3)
 
 def draw_predictions(request):
-    """Callback para desenhar as predições na janela de preview."""
     with MappedArray(request, 'main') as m:
         if last_predictions:
             visualize_pose_estimation_result(last_predictions, m.array, model_size)
+
 
 # --- Lógica Principal de Execução ---
 
@@ -117,23 +137,29 @@ try:
             raw_detections = hailo.run(frame)
             last_predictions = postproc_yolov8_pose(1, raw_detections, model_size)
 
-            pose_found = False
+            pose_found_this_frame = False
             if last_predictions and not recording:
                 scores, keypoints, joint_scores = (
                     last_predictions['scores'][0], last_predictions['keypoints'][0], last_predictions['joint_scores'][0])
                 for i in range(len(scores)):
                     if scores[i][0] > 0.5 and check_arms_crossed_above_head(keypoints[i], joint_scores[i].flatten()):
-                        pose_found = True
+                        pose_found_this_frame = True
                         break
             
-            if pose_found and not recording:
+            # --- LÓGICA DE ESTABILIZAÇÃO (DEBOUNCE) ---
+            if pose_found_this_frame:
+                pose_detected_counter += 1 # Incrementa o contador se a pose for encontrada
+            else:
+                pose_detected_counter = 0 # Zera o contador se a pose for perdida
+
+            # Verifica se o contador atingiu o limite para acionar a gravação
+            if pose_detected_counter >= POSE_TRIGGER_FRAMES and not recording:
                 recording = True
-                print(f"✅ Pose detectada! Acionando LED e gravação...")
+                print(f"✅ Pose confirmada por {POSE_TRIGGER_FRAMES} frames! Acionando LED e gravação...")
                 
-                # *** CONTROLE DO LED COM GPIOZERO ***
-                led.on()  # Liga o LED
+                led.on()
                 time.sleep(3)
-                led.off() # Desliga o LED
+                led.off()
 
                 timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
                 filename = f"gravacao_{timestamp}.h264"
@@ -142,11 +168,12 @@ try:
                 circular_output.stop()
 
                 print(f"✅ Gravação '{filename}' finalizada. Sistema pronto para nova detecção.")
+                
+                # Zera o contador e libera a gravação para a próxima detecção
+                pose_detected_counter = 0
                 recording = False
 
 finally:
-    # Garante que a câmera seja desligada corretamente
     if picam2.is_open:
         picam2.stop_recording()
     print("\nPrograma encerrado.")
-    # Não é necessário GPIO.cleanup(), gpiozero faz isso automaticamente.
