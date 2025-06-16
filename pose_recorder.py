@@ -5,8 +5,8 @@ import cv2
 import time
 from datetime import datetime
 
-# Importa a biblioteca para controle dos pinos GPIO
-import RPi.GPIO as GPIO
+# Importa a biblioteca gpiozero, recomendada para o Raspberry Pi 5
+from gpiozero import LED
 
 # Importa as funções de pós-processamento para o YOLOv8 Pose
 from pose_utils import postproc_yolov8_pose
@@ -19,16 +19,11 @@ from picamera2.devices import Hailo
 
 # --- Configuração Inicial ---
 
-# Define o pino do LED
-LED_PIN = 17
-
-# Configuração do GPIO
-GPIO.setmode(GPIO.BCM)  # Usa a numeração de pinos BCM
-GPIO.setup(LED_PIN, GPIO.OUT)
-GPIO.output(LED_PIN, GPIO.LOW) # Garante que o LED comece desligado
+# Configura o pino do LED usando gpiozero. O número 17 refere-se ao pino BCM 17.
+led = LED(17)
 
 # Analisador de argumentos para especificar o caminho do modelo
-parser = argparse.ArgumentParser(description='Detecção de Pose com Gravação e LED no Hailo')
+parser = argparse.ArgumentParser(description='Detecção de Pose com Gravação e LED no Hailo (Compatível com Pi 5)')
 parser.add_argument('-m', '--model', help="Caminho para o arquivo .hef", default="/usr/share/hailo-models/yolov8s_pose_h8l_pi.hef")
 args = parser.parse_args()
 
@@ -133,14 +128,12 @@ try:
             
             if pose_found and not recording:
                 recording = True
-                
-                # --- CONTROLE DO LED E GRAVAÇÃO ---
                 print(f"✅ Pose detectada! Acionando LED e gravação...")
                 
-                # Liga o LED por 3 segundos
-                GPIO.output(LED_PIN, GPIO.HIGH)
+                # *** CONTROLE DO LED COM GPIOZERO ***
+                led.on()  # Liga o LED
                 time.sleep(3)
-                GPIO.output(LED_PIN, GPIO.LOW)
+                led.off() # Desliga o LED
 
                 timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
                 filename = f"gravacao_{timestamp}.h264"
@@ -152,8 +145,8 @@ try:
                 recording = False
 
 finally:
-    # Garante que tudo seja desligado e limpo corretamente na saída
+    # Garante que a câmera seja desligada corretamente
     if picam2.is_open:
         picam2.stop_recording()
-    GPIO.cleanup() # Limpa as configurações dos pinos GPIO
-    print("\nPrograma encerrado. Pinos GPIO limpos.")
+    print("\nPrograma encerrado.")
+    # Não é necessário GPIO.cleanup(), gpiozero faz isso automaticamente.
