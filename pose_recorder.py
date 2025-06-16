@@ -78,6 +78,12 @@ try:
         picam2.start_recording(encoder, circular_output)
         picam2.pre_callback = draw_predictions
 
+        # pisca o led 3 vezes para indicar que o sistema está pronto
+        for _ in range(3):
+            led.on()
+            time.sleep(1)
+            led.off()
+
         print("🚀 Sistema iniciado. Aguardando detecção da pose...")
 
         while True:
