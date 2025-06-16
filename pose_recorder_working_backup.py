@@ -45,35 +45,15 @@ recording = False
 # --- Funções Principais ---
 
 def check_arms_crossed_above_head(keypoints, joint_scores, threshold=0.5):
-    """
-    Verifica se a pose 'braços cruzados acima da cabeça' foi detectada.
-    Esta versão aprimorada verifica as posições vertical (Y) e horizontal (X).
-    """
-    # Pontos-chave necessários para a verificação
-    required_indices = [L_WRIST, R_WRIST, L_SHOULDER, R_SHOULDER, NOSE]
-    
-    # Garante que todos os pontos-chave relevantes tenham confiança suficiente
-    if not all(joint_scores[i] > threshold for i in required_indices):
-        return False
-
-    # Extrai as coordenadas X e Y dos pontos-chave
-    left_wrist_x, left_wrist_y = keypoints[L_WRIST]
-    right_wrist_x, right_wrist_y = keypoints[R_WRIST]
-    left_shoulder_x, _ = keypoints[L_SHOULDER] # Y do ombro não é necessário aqui
-    right_shoulder_x, _ = keypoints[R_SHOULDER]
-    _, nose_y = keypoints[NOSE] # X do nariz não é necessário aqui
-
-    # --- LÓGICA DE DETECÇÃO APRIMORADA ---
-    # Condição 1: Braços estão PARA CIMA (pulsos verticalmente acima do nariz)
-    arms_are_up = (left_wrist_y < nose_y) and (right_wrist_y < nose_y)
-
-    # Condição 2: Braços estão CRUZADOS (pulsos trocaram de lado em relação aos ombros)
-    arms_are_crossed = (left_wrist_x > right_shoulder_x) and (right_wrist_x < left_shoulder_x)
-
-    # A pose é detectada somente se AMBAS as condições forem verdadeiras
-    if arms_are_up and arms_are_crossed:
-        return True
-    
+    """Verifica se a pose 'braços cruzados acima da cabeça' foi detectada."""
+    if all(joint_scores[i] > threshold for i in [L_WRIST, R_WRIST, L_SHOULDER, R_SHOULDER, NOSE]):
+        left_wrist_y, right_wrist_y = keypoints[L_WRIST][1], keypoints[R_WRIST][1]
+        left_shoulder_y, right_shoulder_y = keypoints[L_SHOULDER][1], keypoints[R_SHOULDER][1]
+        nose_y = keypoints[NOSE][1]
+        if left_wrist_y < nose_y and right_wrist_y < nose_y and \
+           left_wrist_y < (left_shoulder_y + right_shoulder_y) / 2 and \
+           right_wrist_y < (left_shoulder_y + right_shoulder_y) / 2:
+            return True
     return False
 
 def visualize_pose_estimation_result(results, image, model_size, detection_threshold=0.5, joint_threshold=0.5):
@@ -150,9 +130,10 @@ try:
                 recording = True
                 print(f"✅ Pose detectada! Acionando LED e gravação...")
                 
-                led.on()
+                # *** CONTROLE DO LED COM GPIOZERO ***
+                led.on()  # Liga o LED
                 time.sleep(3)
-                led.off()
+                led.off() # Desliga o LED
 
                 timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
                 filename = f"gravacao_{timestamp}.h264"
@@ -164,6 +145,8 @@ try:
                 recording = False
 
 finally:
+    # Garante que a câmera seja desligada corretamente
     if picam2.is_open:
         picam2.stop_recording()
     print("\nPrograma encerrado.")
+    # Não é necessário GPIO.cleanup(), gpiozero faz isso automaticamente.
