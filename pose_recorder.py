@@ -18,7 +18,7 @@ from picamera2.devices import Hailo
 
 # Analisador de argumentos para especificar o caminho do modelo
 parser = argparse.ArgumentParser(description='Detecção de Pose com Gravação por Gatilho no Hailo')
-parser.add_argument('-m', '--model', help="Caminho para o arquivo .hef", default="yolov8s_pose.hef")
+parser.add_argument('-m', '--model', help="Caminho para o arquivo .hef", default="/usr/share/hailo-models/yolov8s_pose_h8l_pi.hef")
 args = parser.parse_args()
 
 # Índices dos pontos-chave (keypoints) do corpo
@@ -102,6 +102,7 @@ def draw_predictions(request):
 
 # --- Lógica Principal de Execução ---
 
+picam2 = Picamera2()
 try:
     with Hailo(args.model) as hailo:
         # Define as resoluções dos streams de vídeo
@@ -110,7 +111,6 @@ try:
         model_size = lores_size = (model_w, model_h)
 
         # Configura a câmera
-        picam2 = Picamera2()
         config = picam2.create_video_configuration(
             main={'size': main_size, 'format': 'XRGB8888'},
             lores={'size': lores_size, 'format': 'RGB888'},
@@ -121,10 +121,16 @@ try:
         # Inicia a janela de preview
         picam2.start_preview(Preview.QTGL, x=0, y=0, width=main_size[0] // 2, height=main_size[1] // 2)
         
-        # Configura o encoder e o buffer circular para 20 segundos a 30 fps
-        encoder = H264Encoder(bitrate=10000000)
-        buffer_frames = 20 * 30
-        circular_output = CircularOutput(frames=buffer_frames)
+        # Configura o encoder e o buffer circular
+        bitrate = 10000000  # 10 Mbps
+        encoder = H264Encoder(bitrate=bitrate)
+        
+        # *** CORREÇÃO APLICADA AQUI ***
+        # Calcula o tamanho do buffer em bytes para 20 segundos de vídeo
+        seconds_to_buffer = 20
+        buffer_size_bytes = int(bitrate / 8 * seconds_to_buffer)
+        circular_output = CircularOutput(buffersize=buffer_size_bytes)
+        
         picam2.start_recording(encoder, circular_output)
         
         # Define a função de callback para desenhar na tela
@@ -145,39 +151,35 @@ try:
             # --- Lógica de Detecção e Gravação ---
             pose_found = False
             if last_predictions and not recording:
-                # Extrai dados (assumindo batch size 1 e uma pessoa)
-                scores = last_predictions['scores'][0]
-                keypoints = last_predictions['keypoints'][0]
-                joint_scores = last_predictions['joint_scores'][0]
+                scores, keypoints, joint_scores = (
+                    last_predictions['scores'][0], last_predictions['keypoints'][0], last_predictions['joint_scores'][0])
                 
-                # Itera sobre as pessoas detectadas no frame
                 for i in range(len(scores)):
-                    if scores[i][0] > 0.5:  # Confiança na detecção da pessoa
+                    if scores[i][0] > 0.5:
                         if check_arms_crossed_above_head(keypoints[i], joint_scores[i].flatten()):
                             pose_found = True
                             break
             
             if pose_found and not recording:
-                recording = True  # Ativa a flag para evitar gravações múltiplas
+                recording = True
                 timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
                 filename = f"gravacao_{timestamp}.h264"
                 
-                print(f"✅ Pose detectada! Salvando os últimos 20 segundos em {filename}")
+                print(f"✅ Pose detectada! Salvando os últimos {seconds_to_buffer} segundos em {filename}")
                 
-                # Salva o conteúdo do buffer circular no arquivo
+                # *** LÓGICA DE GRAVAÇÃO CORRIGIDA ***
+                # Atribui o nome do arquivo e inicia a escrita do buffer para o disco
                 circular_output.fileoutput = filename
                 circular_output.start()
                 
-                # Aguarda um tempo para a gravação finalizar e reseta a flag
-                time.sleep(22) # Um pouco mais de 20s para garantir
+                # Espera a gravação ser finalizada
                 circular_output.stop()
-                print("✅ Gravação finalizada. Sistema pronto para nova detecção.")
+
+                print(f"✅ Gravação '{filename}' finalizada. Sistema pronto para nova detecção.")
                 recording = False
 
 finally:
     # Garante que a câmera seja desligada corretamente
-    if 'picam2' in locals() and picam2.is_open:
+    if picam2.is_open:
         picam2.stop_recording()
-        picam2.stop_preview()
-        picam2.close()
     print("\nPrograma encerrado.")
