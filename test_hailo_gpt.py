@@ -3,7 +3,7 @@
 """
 Hailo Pose-Estimation – braços cruzados
 ► buffer circular sem cópias • gravação MJPG • pipeline na main-thread
-Jun 2025  rev. 2b
+Jun 2025  rev. 2c (ajuste Timer daemon)
 """
 
 import gi, os, cv2, hailo, time, threading, numpy as np, psutil, gc
@@ -12,7 +12,7 @@ from datetime import datetime
 gi.require_version("Gst", "1.0")
 from gi.repository import Gst, GLib
 
-# ───────────────────────── HAILO APPS INFRA ────────────────────────────────
+# ────────────────── HAILO APPS INFRA ───────────────────────────────────────
 from hailo_apps_infra.hailo_rpi_common import (
     get_caps_from_pad,
     get_numpy_from_buffer,
@@ -20,7 +20,7 @@ from hailo_apps_infra.hailo_rpi_common import (
 )
 from hailo_apps_infra.pose_estimation_pipeline import GStreamerPoseEstimationApp
 
-# ───────────────────────── CONFIGURAÇÃO ────────────────────────────────────
+# ────────────────── CONFIGURAÇÃO ───────────────────────────────────────────
 BUFFER_SECONDS       = 20
 DETECTION_INTERVAL   = 0.25          # ~4 Hz
 POSE_HOLD_SECONDS    = 0.8
@@ -28,10 +28,10 @@ OUTPUT_DIR           = "recordings"
 FILE_PREFIX_AUTO     = "arms_"
 FILE_PREFIX_MANUAL   = "manual_"
 MAX_RECORD_FPS       = 20
-BUFFER_SCALE         = 0.4
+BUFFER_SCALE         = 0.4           # 1280×720 → 512×288
 CODEC_FOURCC         = cv2.VideoWriter_fourcc(*"MJPG")
 
-# ───────────────────────── LED opcional ────────────────────────────────────
+# ────────────────── LED opcional ───────────────────────────────────────────
 LED_AVAILABLE = False
 try:
     import gpiod
@@ -46,11 +46,15 @@ except Exception as e:
     print("[LED] desativado:", e)
 
 def pulse_led(sec=3.0):
-    if LED_AVAILABLE:
-        _led.set_value(1)
-        threading.Timer(sec, lambda: _led.set_value(0), daemon=True).start()
+    """Acende o LED por ‘sec’ segundos (thread daemon compatível Python ≤ 3.9)."""
+    if not LED_AVAILABLE:
+        return
+    _led.set_value(1)
+    t = threading.Timer(sec, lambda: _led.set_value(0))
+    t.daemon = True          # define como daemon depois de instanciar
+    t.start()
 
-# ────────────────────── Fallback RGB extraction ────────────────────────────
+# ────────────────── Fallback RGB extraction ───────────────────────────────
 def gstbuffer_to_rgb(buf, w, h):
     ok, info = buf.map(Gst.MapFlags.READ)
     if not ok:
@@ -64,7 +68,7 @@ def gstbuffer_to_rgb(buf, w, h):
     finally:
         buf.unmap(info)
 
-# ───────────────────────── Estado global ───────────────────────────────────
+# ────────────────── Estado global ─────────────────────────────────────────
 class State(app_callback_class):
     def __init__(self):
         super().__init__()
@@ -84,11 +88,11 @@ class State(app_callback_class):
 S = State()
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-# ───────────────────── Thread de gravação ──────────────────────────────────
+# ────────────────── Thread de gravação ─────────────────────────────────────
 def writer_thread(frames, fname, fps):
     try:
         os.nice(-10)
-    except:
+    except:  # permissões
         pass
     if not frames:
         S.recording = False
@@ -119,8 +123,9 @@ def save_buffer(manual=False):
     with S.lock:
         if not S.frames:
             return
-        frames_for_write = list(S.frames)   # referências, sem cópias
-        S.frames.clear();  S.stamps.clear() # libera RAM
+        frames_for_write = list(S.frames)   # referências (sem cópias)
+        S.frames.clear()
+        S.stamps.clear()                    # libera RAM antes de gravar
     tag   = FILE_PREFIX_MANUAL if manual else FILE_PREFIX_AUTO
     fname = os.path.join(OUTPUT_DIR,
                          f"{tag}{datetime.now():%Y%m%d_%H%M%S}.avi")
@@ -130,7 +135,7 @@ def save_buffer(manual=False):
                      daemon=True).start()
     pulse_led()
 
-# ───────────────────── Callback GStreamer ─────────────────────────────────
+# ────────────────── Callback GStreamer ─────────────────────────────────────
 def app_callback(pad, info, _):
     buf = info.get_buffer()
     if not buf:
@@ -171,7 +176,7 @@ def app_callback(pad, info, _):
             S.frames.append(frame)
             S.stamps.append(now)
 
-    # detecção (sub-amostrada)
+    # detecção a cada DETECTION_INTERVAL
     if now - getattr(app_callback, "_last_det", 0) >= DETECTION_INTERVAL:
         app_callback._last_det = now
         roi  = hailo.get_roi_from_buffer(buf)
@@ -217,7 +222,7 @@ def app_callback(pad, info, _):
             gc.collect()
     return Gst.PadProbeReturn.OK
 
-# ─────────────────── UI (thread secundária) ───────────────────────────────
+# ────────────────── UI (thread secundária) ────────────────────────────────
 def ui_loop(stop_event):
     cv2.startWindowThread()
     print("[TECLAS] q  g  +  -")
@@ -251,7 +256,7 @@ def ui_loop(stop_event):
         time.sleep(0.003)
     cv2.destroyAllWindows()
 
-# ─────────────────────────── MAIN ─────────────────────────────────────────
+# ───────────────────────────────── MAIN ────────────────────────────────────
 if __name__ == "__main__":
     print(f"[BOOT] buf={BUFFER_SECONDS}s det={1/DETECTION_INTERVAL:.1f}/s "
           f"scale={BUFFER_SCALE} codec=MJPG")
@@ -259,13 +264,12 @@ if __name__ == "__main__":
     app = GStreamerPoseEstimationApp(app_callback, S)
 
     stop_evt = threading.Event()
-    # UI em *thread* separada
     threading.Thread(target=ui_loop, args=(stop_evt,), daemon=True).start()
 
     try:
-        app.run()                 # BLOQUEANTE na main-thread (sem assert)
+        app.run()                 # pipeline na main-thread (sem assert)
     finally:
-        stop_evt.set()            # garante saída da UI
+        stop_evt.set()
         if LED_AVAILABLE:
-            _led.set_value(0);  _led.release();  _chip.close()
+            _led.set_value(0); _led.release(); _chip.close()
         print("[EXIT] finalizado")
