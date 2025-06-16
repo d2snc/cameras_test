@@ -1,134 +1,199 @@
-#!/usr/bin/env python3
-"""
-Arms‑crossed detector + rolling video recorder accelerated by Hailo‑8L.
-2025‑06‑16 rev.5 — visualização sempre ativa
-• Janela "Pose" com overlay ativada por padrão (OpenCV).
-• Novo flag `--no-show` para rodar headless se necessário.
-• Mantém Picamera2 padrão; `--usb` muda para webcam.
-• HEF padrão `yolov8s_pose.hef`.
-"""
-import argparse, collections, os, pathlib, queue, threading
-from datetime import datetime
+import cv2
+import numpy as np
+import time
+from picamera2 import Picamera2
+from collections import deque
+import threading
+import datetime
+import os
 
-import gi, cv2, numpy as np, hailo
+# --- Importações da Hailo ---
+from hailo_platform import (HEF, VDevice, HailoStreamInterface, ConfigureParams,
+                            InputVStream, OutputVStream)
 
-gi.require_version("Gst", "1.0")
-from gi.repository import Gst
+# --- Configurações ---
+HEF_PATH = 'yolov8s_pose.hef'
+VIDEO_DURATION_SECONDS = 20
+CAMERA_RESOLUTION = (640, 480) # Resolução para a câmera e modelo
+COOLDOWN_SECONDS = 30 # Tempo de espera em segundos após salvar um vídeo
 
-from hailo_apps_infra.hailo_rpi_common import (
-    get_numpy_from_buffer,
-    app_callback_class,
-)
-from hailo_apps_infra.pose_estimation_pipeline import GStreamerPoseEstimationApp
+# --- Mapeamento de Pontos-Chave (Keypoints) do YOLOv8-Pose ---
+# (Verifique se corresponde ao seu modelo, este é o padrão COCO)
+NOSE = 0
+LEFT_SHOULDER = 5
+RIGHT_SHOULDER = 6
+LEFT_WRIST = 9
+RIGHT_WRIST = 10
 
-# --------------------------- GPIO ------------------------------------------
-try:
-    import gpiod
-    LED = gpiod.Chip("gpiochip0").get_line(17)
-    LED.request(consumer="pose-led", type=gpiod.LINE_REQ_DIR_OUT, default_vals=[0])
-    GPIO_OK = True
-except Exception as e:
-    print("[WARN] GPIO17 LED disabled:", e)
-    GPIO_OK = False
+def setup_hailo_device(hef_path):
+    """Inicializa o VDevice da Hailo e carrega o HEF."""
+    print("🔎 Inicializando dispositivo Hailo e carregando HEF...")
+    devices = VDevice.scan()
+    if not devices:
+        raise RuntimeError("Nenhum dispositivo Hailo encontrado.")
+    
+    target = VDevice(devices[0])
+    
+    # Carrega o modelo compilado (HEF)
+    hef = HEF(hef_path)
+    
+    # Configura os streams de entrada/saída
+    configure_params = ConfigureParams.create_from_hef(hef, interface=HailoStreamInterface.PCIe)
+    network_group = target.configure(hef, configure_params)[0]
+    
+    # Obtenha informações sobre input e output
+    input_vstreams = InputVStream.make(network_group, transfer_mode=HailoStreamInterface.PCIe)
+    output_vstreams = OutputVStream.make(network_group, transfer_mode=HailoStreamInterface.PCIe)
+    
+    print("✅ Dispositivo Hailo pronto.")
+    return target, hef, input_vstreams[0], output_vstreams[0]
 
-def pulse_led(dur=3.0):
-    if GPIO_OK:
-        LED.set_value(1)
-        threading.Timer(dur, lambda: LED.set_value(0), daemon=True).start()
 
-# ---------------- Heurística braços cruzados -------------------------------
-class ArmsCrossDetector:
-    NOSE, L_WRIST, R_WRIST = 0, 9, 10
-    def __init__(self, margin=10): self.margin = margin
-    def __call__(self, k):
-        try:
-            nose_y = k[self.NOSE][1]; lw_x, lw_y = k[self.L_WRIST]; rw_x, rw_y = k[self.R_WRIST]
-            return lw_y < nose_y-self.margin and rw_y < nose_y-self.margin and lw_x > rw_x
-        except Exception:
-            return False
+def save_video_from_buffer(video_buffer, resolution, fps):
+    """Salva os frames do buffer em um arquivo de vídeo."""
+    if not video_buffer:
+        print("⚠️ Buffer de vídeo vazio, nada para salvar.")
+        return
 
-# -------------------------- Callback ---------------------------------------
-class ArmsCallback(app_callback_class):
-    def __init__(self, buf_len, fps, preview_q):
-        super().__init__(); self.use_frame = True
-        self.buf = collections.deque(maxlen=buf_len); self.fps = fps; self.det = ArmsCrossDetector()
-        self.preview_q = preview_q; self.cool = 0
-    def _save(self):
-        if not self.buf: return
-        h,w,_ = self.buf[0].shape; ts=datetime.now().strftime("%Y%m%d_%H%M%S")
-        out=pathlib.Path("recordings"); out.mkdir(exist_ok=True)
-        path=out/f"arms_{ts}.mp4"; vw=cv2.VideoWriter(str(path), cv2.VideoWriter_fourcc(*"mp4v"),self.fps,(w,h))
-        for f in list(self.buf): vw.write(f)
-        vw.release(); print(f"[SAVE] {path} ({len(self.buf)}f)")
-    def handle_buffer(self, pad, info):
-        buf=info.get_buffer(); frame=get_numpy_from_buffer(buf); self.buf.append(frame.copy())
-        kpts=[]; meta=buf.get_meta("HailoJsonMeta")
-        if meta:
-            import json
-            objs=json.loads(meta.get_json()).get("objects",[])
-            if objs:
-                kpts=[(p['x'],p['y']) for p in max(objs,key=lambda o:o['confidence'])['keypoints']]
-        crossed=self.det(kpts)
-        label="ARMS CROSSED" if crossed else "ARMS NOT CROSSED"
-        cv2.putText(frame, label, (30,40), cv2.FONT_HERSHEY_SIMPLEX,1.2,(0,0,255) if crossed else (0,255,0),3)
-        if self.preview_q:
-            try: self.preview_q.put_nowait(cv2.cvtColor(frame, cv2.COLOR_RGB2BGR))
-            except queue.Full: pass
-        if crossed and self.cool==0:
-            pulse_led(); threading.Thread(target=self._save, daemon=True).start(); self.cool=self.fps*5
-        else: self.cool=max(0,self.cool-1)
-        return Gst.PadProbeReturn.OK
+    timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    filename = f"gravacao_{timestamp}.mp4"
+    
+    print(f"🎬 Salvando vídeo: {filename}")
+    
+    # Usa o codec 'mp4v' para compatibilidade
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+    out = cv2.VideoWriter(filename, fourcc, fps, resolution)
 
-# -------------------------- Preview Thread ---------------------------------
-class PreviewThread(threading.Thread):
-    def __init__(self,q): super().__init__(daemon=True); self.q=q; self._stop=threading.Event()
-    def run(self):
-        while not self._stop.is_set():
-            try:
-                frame=self.q.get(timeout=0.1)
-                cv2.imshow("Pose", frame)
-            except queue.Empty:
-                continue
-            if cv2.waitKey(1)&0xFF==27: self._stop.set()
-        cv2.destroyAllWindows()
-    def stop(self): self._stop.set()
+    for frame in list(video_buffer):
+        out.write(frame)
 
-# --------------------------- main ------------------------------------------
+    out.release()
+    print(f"✅ Vídeo salvo com sucesso!")
+
+
+def check_arms_crossed_above_head(keypoints, frame_shape):
+    """
+    Verifica se a pose 'braços cruzados acima da cabeça' é detectada.
+    `keypoints` é um array com formato (17, 3) para [x, y, confidence].
+    """
+    if keypoints.shape[0] < 17:
+        return False
+
+    h, w = frame_shape
+
+    # Extrai os pontos-chave necessários
+    nose_pt = keypoints[NOSE]
+    left_shoulder_pt = keypoints[LEFT_SHOULDER]
+    right_shoulder_pt = keypoints[RIGHT_SHOULDER]
+    left_wrist_pt = keypoints[LEFT_WRIST]
+    right_wrist_pt = keypoints[RIGHT_WRIST]
+
+    # Verifica a confiança (só analisa se os pontos-chave foram detectados com certeza)
+    min_confidence = 0.5
+    if any(pt[2] < min_confidence for pt in [nose_pt, left_shoulder_pt, right_shoulder_pt, left_wrist_pt, right_wrist_pt]):
+        return False
+
+    # Condição 1: Pulsos acima dos ombros e do nariz (coordenada Y menor)
+    wrist_above_shoulders = left_wrist_pt[1] < left_shoulder_pt[1] and right_wrist_pt[1] < right_shoulder_pt[1]
+    wrist_above_nose = left_wrist_pt[1] < nose_pt[1] and right_wrist_pt[1] < nose_pt[1]
+
+    # Condição 2: Pulsos cruzados (pulso esquerdo mais à direita que o direito)
+    wrists_crossed = left_wrist_pt[0] > right_wrist_pt[0]
+
+    return wrist_above_shoulders and wrist_above_nose and wrists_crossed
+
 
 def main():
-    Gst.init(None)
-    ap=argparse.ArgumentParser()
-    ap.add_argument("--hef", default="yolov8s_pose.hef", help="HEF file (default: yolov8s_pose.hef)")
-    ap.add_argument("--fps", type=int, default=30)
-    ap.add_argument("--width", type=int, default=1280)
-    ap.add_argument("--height", type=int, default=720)
-    ap.add_argument("--buffer", type=int, default=20)
-    ap.add_argument("--no-show", action="store_true", help="Roda sem janela de preview")
-    ap.add_argument("--usb", action="store_true", help="/dev/video0 webcam instead of Picamera2")
-    args=ap.parse_args()
+    # --- Inicialização ---
+    picam2 = Picamera2()
+    config = picam2.create_preview_configuration(main={"size": CAMERA_RESOLUTION, "format": "RGB888"})
+    picam2.configure(config)
+    picam2.start()
+    print("📷 Câmera iniciada.")
 
-    if not os.path.exists(args.hef):
-        raise FileNotFoundError(f"HEF '{args.hef}' não encontrado")
+    target, hef, input_vstream, output_vstream = setup_hailo_device(HEF_PATH)
+    
+    # Determina o FPS da câmera e o tamanho do buffer
+    # A captura e o processamento podem não atingir o FPS máximo, então medimos.
+    # Por segurança, calculamos o buffer com um FPS estimado de 15.
+    estimated_fps = 15
+    buffer_size = VIDEO_DURATION_SECONDS * estimated_fps
+    video_buffer = deque(maxlen=buffer_size)
 
-    preview_q = None if args.no_show else queue.Queue(maxsize=2)
-    user_data = ArmsCallback(args.buffer*args.fps, args.fps, preview_q)
+    last_trigger_time = 0
 
-    def cb(pad, info, ud): return ud.handle_buffer(pad, info)
-    app = GStreamerPoseEstimationApp(app_callback=cb, user_data=user_data)
-    app.hef_path=os.path.abspath(args.hef)
-    app.src_caps=f"video/x-raw,format=RGB,width={args.width},height={args.height},framerate={args.fps}/1"
-    app.video_source="v4l2src device=/dev/video0" if args.usb else "libcamerasrc"
-
-    pv=PreviewThread(preview_q) if preview_q else None
-    if pv: pv.start()
+    print("🚀 Iniciando loop de detecção...")
     try:
-        app.run()
-    except KeyboardInterrupt:
-        pass
-    finally:
-        app.stop();
-        if pv:
-            pv.stop(); pv.join()
+        while True:
+            # Captura e pré-processamento do frame
+            frame = picam2.capture_array()
+            
+            # Adiciona o frame ao buffer circular
+            video_buffer.append(frame)
 
-if __name__=="__main__":
-    main()
+            # Envia o frame para inferência no Hailo-8L
+            with input_vstream.write_async(frame):
+                # Enquanto a inferência acontece, podemos fazer outras coisas se necessário
+                # Aqui, vamos esperar pelo resultado
+                result_raw = output_vstream.read(timeout=1000) # Timeout de 1s
+            
+            # O pós-processamento depende da saída exata do seu modelo YOLOv8.
+            # Geralmente é uma combinação de caixas delimitadoras e pontos-chave.
+            # Assumindo que a saída já foi processada para extrair os keypoints
+            # de uma pessoa. Esta parte pode precisar de ajuste!
+            
+            # **ADAPTE ESTA PARTE CONFORME A SAÍDA DO SEU MODELO**
+            # Exemplo: Vamos assumir que `result_raw` contém um array de detecções,
+            # e cada detecção tem a pose. Para simplificar, pegamos a primeira.
+            # A forma da saída pode ser (1, 84, 8400) ou similar.
+            # Você precisará de uma função de pós-processamento para decodificar isso.
+            
+            # Placeholder para a lógica de pós-processamento real
+            # Aqui, simulamos que `post_process` retorna uma lista de poses detectadas
+            # e cada pose é um array (17, 3) de [x, y, conf].
+            #detections = post_process_yolov8_pose(result_raw)
+            
+            # --- SIMULAÇÃO DE DETECÇÃO PARA TESTE ---
+            # Para testar sem a lógica de pós-processamento complexa, você pode
+            # pular a inferência e desenhar pontos-chave falsos na tela.
+            # Esta seção deve ser substituída pela sua lógica de pós-processamento real.
+            
+            # --- LÓGICA DE DETECÇÃO REAL ---
+            # (Aqui você implementaria a decodificação da saída `result_raw`)
+            # Por enquanto, vamos assumir que não há detecção para o loop continuar.
+            detections = [] 
+
+            # Itera sobre todas as pessoas detectadas no frame
+            for person_keypoints in detections:
+                if time.time() - last_trigger_time < COOLDOWN_SECONDS:
+                    continue # Respeita o tempo de espera
+
+                is_triggered = check_arms_crossed_above_head(person_keypoints, frame.shape[:2])
+
+                if is_triggered:
+                    print(f"🚨 Gesto detectado! Salvando {VIDEO_DURATION_SECONDS} segundos de vídeo.")
+                    last_trigger_time = time.time()
+                    
+                    # Salva o vídeo em uma thread separada para não bloquear a captura
+                    save_thread = threading.Thread(target=save_video_from_buffer, args=(list(video_buffer), CAMERA_RESOLUTION, estimated_fps))
+                    save_thread.start()
+                    break # Sai do loop de detecções para este frame
+            
+            # Opcional: Mostrar o vídeo na tela para depuração
+            # cv2.imshow("Camera Feed", frame)
+            # if cv2.waitKey(1) & 0xFF == ord('q'):
+            #     break
+
+    except KeyboardInterrupt:
+        print("\n🛑 Parando o script.")
+    finally:
+        picam2.stop()
+        # cv2.destroyAllWindows()
+        print("Recursos liberados.")
+
+
+if __name__ == "__main__":
+    if not os.path.exists(HEF_PATH):
+        print(f"ERRO: Arquivo {HEF_PATH} não encontrado. Certifique-se de que ele está no mesmo diretório do script.")
+    else:
+        main()
