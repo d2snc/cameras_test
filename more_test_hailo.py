@@ -1,158 +1,243 @@
 #!/usr/bin/env python3
 """
-Script de teste para fazer uma inferência básica no Hailo
+Versão simplificada do detector usando HailoRT Runner API
 """
 
+import cv2
 import numpy as np
-from hailo_platform import HEF, VDevice, ConfigureParams, HailoStreamInterface
+from collections import deque
+from datetime import datetime
+import threading
+import time
+from picamera2 import Picamera2
+from hailo_platform import (
+    Device,
+    HEF,
+    VDevice,
+    HailoStreamInterface,
+    ConfigureParams,
+    InferVStreams,
+    InputVStreamParams,
+    OutputVStreamParams,
+    QuantizationParam,
+    FormatType
+)
 
-def test_basic_inference(hef_path):
-    """Testa inferência básica com o Hailo"""
-    print("=== Teste de Inferência Básica ===\n")
+class SimplePoseDetector:
+    def __init__(self, hef_path, buffer_seconds=20, fps=30):
+        self.hef_path = hef_path
+        self.buffer_seconds = buffer_seconds
+        self.fps = fps
+        self.frame_buffer = deque(maxlen=buffer_seconds * fps)
+        self.saving_video = False
+        self.detection_cooldown = 5
+        self.last_detection_time = 0
+        
+        # Keypoints indices
+        self.NOSE = 0
+        self.LEFT_WRIST = 9
+        self.RIGHT_WRIST = 10
+        self.LEFT_SHOULDER = 5
+        self.RIGHT_SHOULDER = 6
+        
+        self.setup_hailo_simple()
+        self.setup_camera()
     
-    try:
-        # 1. Carregar HEF
-        print("1. Carregando HEF...")
-        hef = HEF(hef_path)
-        print("✓ HEF carregado")
-        
-        # 2. Obter informações
-        network_names = hef.get_network_group_names()
-        print(f"\n2. Redes: {network_names}")
-        
-        input_infos = hef.get_input_vstream_infos()
-        output_infos = hef.get_output_vstream_infos()
-        
-        print(f"\nEntrada:")
-        for info in input_infos:
-            print(f"  - {info.name}: {info.shape}")
-            
-        print(f"\nSaídas ({len(output_infos)}):")
-        for i, info in enumerate(output_infos):
-            print(f"  {i}: {info.name}: {info.shape}")
-            
-        # 3. Criar dados de teste
-        print("\n3. Criando dados de teste...")
-        input_shape = input_infos[0].shape
-        # Criar imagem aleatória RGB
-        test_image = np.random.randint(0, 255, size=(input_shape[0], input_shape[1], input_shape[2]), dtype=np.uint8)
-        print(f"✓ Imagem de teste criada: {test_image.shape}")
-        
-        # 4. Criar VDevice
-        print("\n4. Criando VDevice...")
+    def setup_hailo_simple(self):
+        """Setup Hailo usando a API simplificada"""
+        # Criar Virtual Device (VDevice)
         params = VDevice.create_params()
         params.device_count = 1
         
         with VDevice(params) as vdevice:
-            print("✓ VDevice criado")
+            # Carregar HEF
+            hef = HEF(self.hef_path)
             
-            # 5. Configurar
-            print("\n5. Configurando rede...")
+            # Obter informações da rede
+            network_name = hef.get_network_group_names()[0]
+            network_group = hef.get_network_group(network_name)
+            
+            # Configurar dispositivo
             configure_params = ConfigureParams.create_from_hef(
-                hef, 
+                hef=hef,
                 interface=HailoStreamInterface.PCIe
             )
             
-            # Configure
-            network_group = vdevice.configure(hef, configure_params)
-            print(f"✓ Configurado. Tipo retornado: {type(network_group)}")
+            network_group_handle = vdevice.configure(hef, configure_params)[network_name]
             
-            # Se for dicionário, pegar o primeiro network group
-            if isinstance(network_group, dict):
-                network_name = list(network_group.keys())[0]
-                network_group = network_group[network_name]
-                print(f"✓ Usando network group: {network_name}")
+            # Salvar handles para uso posterior
+            self.vdevice = vdevice
+            self.hef = hef
+            self.network_group_handle = network_group_handle
+            self.network_name = network_name
             
-            # 6. Criar bindings
-            print("\n6. Criando bindings...")
-            bindings = network_group.create_bindings()
-            print("✓ Bindings criados")
+            # Obter informações de entrada/saída
+            self.input_vstream_info = hef.get_input_vstream_infos()[0]
+            self.output_vstream_info = hef.get_output_vstream_infos()[0]
             
-            # 7. Configurar entrada
-            print("\n7. Configurando buffers...")
-            input_name = input_infos[0].name
-            bindings.input(input_name).set_buffer(test_image)
-            print(f"✓ Buffer de entrada configurado: {input_name}")
-            
-            # 8. Configurar saídas
-            output_buffers = {}
-            for i, output_info in enumerate(output_infos):
-                shape = list(output_info.shape)
-                buffer = np.empty(shape, dtype=np.float32)
-                bindings.output(output_info.name).set_buffer(buffer)
-                output_buffers[output_info.name] = buffer
-                print(f"✓ Buffer de saída {i} configurado: {output_info.name}")
-                
-            # 9. Executar inferência
-            print("\n8. Executando inferência...")
-            with network_group.activate(bindings):
-                job = network_group.run_async(bindings, None)
-                status = job.wait(5000)  # 5 segundos timeout
-                print(f"✓ Inferência completa. Status: {status}")
-                
-            # 10. Verificar resultados
-            print("\n9. Resultados:")
-            for name, buffer in output_buffers.items():
-                print(f"  - {name}: shape={buffer.shape}, min={buffer.min():.3f}, max={buffer.max():.3f}, mean={buffer.mean():.3f}")
-                
-        print("\n✓ Teste completo com sucesso!")
-        return True
-        
-    except Exception as e:
-        print(f"\n✗ Erro: {e}")
-        import traceback
-        traceback.print_exc()
-        return False
-
-def test_simple_activation(hef_path):
-    """Teste ainda mais simples"""
-    print("\n=== Teste Simples de Ativação ===\n")
+            print(f"Modelo carregado: {network_name}")
+            print(f"Entrada: {self.input_vstream_info.shape}")
+            print(f"Saída: {self.output_vstream_info.shape}")
     
-    try:
-        hef = HEF(hef_path)
+    def setup_camera(self):
+        """Configura a PiCamera2"""
+        self.camera = Picamera2()
+        config = self.camera.create_preview_configuration(
+            main={"size": (640, 640), "format": "RGB888"},
+            controls={"FrameRate": self.fps}
+        )
+        self.camera.configure(config)
+        self.camera.start()
+    
+    def preprocess_frame(self, frame):
+        """Preprocessa o frame"""
+        # Redimensionar se necessário
+        input_shape = self.input_vstream_info.shape
+        if frame.shape[:2] != (input_shape[1], input_shape[2]):
+            frame = cv2.resize(frame, (input_shape[2], input_shape[1]))
         
-        # Parâmetros mínimos
-        vdevice_params = VDevice.create_params()
-        vdevice_params.device_count = 1
+        # Converter para o formato esperado
+        frame = frame.astype(np.float32) / 255.0
         
-        # Criar VDevice
-        vdevice = VDevice(vdevice_params)
-        print("✓ VDevice criado")
+        # Transpor se necessário (NHWC -> NCHW)
+        if len(input_shape) == 4 and input_shape[1] == 3:
+            frame = np.transpose(frame, (2, 0, 1))
         
-        # Configurar
-        params = ConfigureParams.create_from_hef(hef, interface=HailoStreamInterface.PCIe)
-        network_groups = vdevice.configure(hef, params)
-        print(f"✓ Configurado. Tipo: {type(network_groups)}")
+        # Adicionar batch dimension
+        frame = np.expand_dims(frame, axis=0)
         
-        # Listar conteúdo
-        if isinstance(network_groups, dict):
-            print(f"  Chaves: {list(network_groups.keys())}")
-        elif hasattr(network_groups, '__len__'):
-            print(f"  Tamanho: {len(network_groups)}")
+        return frame
+    
+    def run_inference_simple(self, frame):
+        """Executa inferência de forma simplificada"""
+        input_data = self.preprocess_frame(frame)
         
-        # Limpar
-        vdevice.release()
-        print("✓ VDevice liberado")
+        # Preparar buffers
+        input_buffer = {self.input_vstream_info.name: input_data}
+        output_buffer = {self.output_vstream_info.name: np.empty(self.output_vstream_info.shape)}
         
-        return True
+        # Executar inferência
+        with self.network_group_handle.activate():
+            self.network_group_handle.wait_for_activation(100)
+            
+            # Enviar dados
+            self.network_group_handle.send_input_frame(
+                self.input_vstream_info.name,
+                input_data
+            )
+            
+            # Receber resultado
+            output = self.network_group_handle.recv_output_frame(
+                self.output_vstream_info.name
+            )
         
-    except Exception as e:
-        print(f"✗ Erro: {e}")
+        return self.postprocess_output(output)
+    
+    def postprocess_output(self, output):
+        """Processa saída do modelo"""
+        poses = []
+        
+        # Assumindo formato YOLOv8 Pose
+        # output shape: [1, num_detections, 56]
+        detections = output[0]
+        
+        for detection in detections:
+            confidence = detection[4]
+            if confidence > 0.5:
+                keypoints = detection[5:].reshape(17, 3)
+                poses.append({
+                    'keypoints': keypoints,
+                    'confidence': confidence
+                })
+        
+        return poses
+    
+    def check_arms_crossed(self, keypoints):
+        """Verifica braços cruzados acima da cabeça"""
+        # Extrair pontos relevantes
+        nose = keypoints[self.NOSE]
+        left_wrist = keypoints[self.LEFT_WRIST]
+        right_wrist = keypoints[self.RIGHT_WRIST]
+        left_shoulder = keypoints[self.LEFT_SHOULDER]
+        right_shoulder = keypoints[self.RIGHT_SHOULDER]
+        
+        # Verificar confiança mínima
+        if any(kp[2] < 0.3 for kp in [nose, left_wrist, right_wrist, left_shoulder, right_shoulder]):
+            return False
+        
+        # Pulsos acima da cabeça?
+        if left_wrist[1] > nose[1] or right_wrist[1] > nose[1]:
+            return False
+        
+        # Braços cruzados?
+        if left_wrist[0] > right_shoulder[0] and right_wrist[0] < left_shoulder[0]:
+            return True
+        
         return False
+    
+    def save_video(self):
+        """Salva buffer de vídeo"""
+        if self.saving_video:
+            return
+        
+        self.saving_video = True
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"arms_crossed_{timestamp}.mp4"
+        
+        frames = list(self.frame_buffer)
+        
+        def save_thread():
+            fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+            out = cv2.VideoWriter(filename, fourcc, self.fps, (640, 640))
+            
+            for frame in frames:
+                frame_bgr = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+                out.write(frame_bgr)
+            
+            out.release()
+            print(f"Vídeo salvo: {filename}")
+            self.saving_video = False
+        
+        threading.Thread(target=save_thread).start()
+    
+    def run(self):
+        """Loop principal"""
+        print("Detector iniciado. Pressione 'q' para sair.")
+        
+        try:
+            while True:
+                # Capturar frame
+                frame = self.camera.capture_array()
+                self.frame_buffer.append(frame.copy())
+                
+                # Inferência
+                poses = self.run_inference_simple(frame)
+                
+                # Verificar poses
+                current_time = time.time()
+                for pose in poses:
+                    if self.check_arms_crossed(pose['keypoints']):
+                        if current_time - self.last_detection_time > self.detection_cooldown:
+                            print("Braços cruzados detectados!")
+                            self.save_video()
+                            self.last_detection_time = current_time
+                
+                # Visualização simples
+                display = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+                status = "Gravando..." if self.saving_video else "Monitorando"
+                cv2.putText(display, status, (10, 30), 
+                           cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+                
+                cv2.imshow('Pose Detection', display)
+                
+                if cv2.waitKey(1) & 0xFF == ord('q'):
+                    break
+                    
+        finally:
+            self.camera.stop()
+            cv2.destroyAllWindows()
+            print("Detector encerrado.")
 
 if __name__ == "__main__":
-    import sys
-    
-    if len(sys.argv) < 2:
-        print("Uso: python3 test_inference.py <arquivo.hef>")
-        sys.exit(1)
-        
-    hef_path = sys.argv[1]
-    
-    # Teste simples primeiro
-    if test_simple_activation(hef_path):
-        print("\n" + "="*50 + "\n")
-        # Teste completo
-        test_basic_inference(hef_path)
-    else:
-        print("\nTeste simples falhou. Verifique a instalação do Hailo.")
+    detector = SimplePoseDetector("yolov8s_pose.hef")
+    detector.run()
