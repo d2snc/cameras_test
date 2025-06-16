@@ -1,429 +1,324 @@
-import gi
-gi.require_version('Gst', '1.0')
-from gi.repository import Gst, GLib
-import os
-import numpy as np
+#!/usr/bin/env python3
+"""
+Detector de braços cruzados acima da cabeça usando YOLOv8 Pose no Hailo 8L
+Salva 20 segundos de vídeo anteriores ao gesto detectado
+"""
+
 import cv2
-import hailo
-import time
-import threading
+import numpy as np
 from collections import deque
 from datetime import datetime
-import gc  # Added missing import
-import psutil  # Added missing import
-
-from hailo_apps_infra.hailo_rpi_common import (
-    get_caps_from_pad,
-    get_numpy_from_buffer,
-    app_callback_class,
+import threading
+import time
+from picamera2 import Picamera2
+from hailo_platform import (
+    HEF,
+    ConfigureParams,
+    InputVStreamParams,
+    OutputVStreamParams,
+    FormatType,
+    HailoStreamInterface,
+    InferVStreams,
+    InputVStreams,
+    OutputVStreams
 )
-from hailo_apps_infra.pose_estimation_pipeline import GStreamerPoseEstimationApp
 
-# -----------------------------------------------------------------------------------------------
-# GPIO Configuration
-# -----------------------------------------------------------------------------------------------
-LED_AVAILABLE = False
-try:
-    import gpiod
-    CHIP_NAME = "gpiochip4"
-    LED_LINE_OFFSET = 17
-    chip = gpiod.Chip(CHIP_NAME)
-    led_line = chip.get_line(LED_LINE_OFFSET)
-    led_line.request(
-        consumer="hailo-led",
-        type=gpiod.LINE_REQ_DIR_OUT,
-        default_vals=[0],
-    )
-    LED_AVAILABLE = True
-    print("GPIO setup for LED on pin 17 successful.")
-except Exception as e:
-    print(f"LED disabled: {e}")
-
-# -----------------------------------------------------------------------------------------------
-# Recording Configuration
-# -----------------------------------------------------------------------------------------------
-BUFFER_SECONDS = 20  # Changed to 20 seconds as requested
-RECORDING_FOLDER = "recordings"
-FILE_PREFIX = "arms_crossed_"
-POSE_CONFIDENCE_THRESHOLD = 0.5
-POSE_DURATION_SECONDS = 0.8
-
-# Memory optimization settings
-BUFFER_FPS = 30  # Store 30 FPS in buffer for smooth video
-BUFFER_SCALE = 0.5  # Scale frames to 50% for buffer storage
-
-if not os.path.exists(RECORDING_FOLDER):
-    os.makedirs(RECORDING_FOLDER)
-
-# -----------------------------------------------------------------------------------------------
-# Direct frame extraction function
-# -----------------------------------------------------------------------------------------------
-def extract_rgb_frame_from_buffer(buffer, width=1280, height=720):
-    """Extract RGB frame directly from GStreamer buffer."""
-    expected_size = width * height * 3  # RGB = 3 channels
+class PoseDetector:
+    def __init__(self, hef_path, buffer_seconds=20, fps=30):
+        """
+        Inicializa o detector de pose
+        
+        Args:
+            hef_path: Caminho para o arquivo .hef do YOLOv8 Pose
+            buffer_seconds: Segundos de vídeo a manter no buffer
+            fps: FPS do vídeo
+        """
+        self.hef_path = hef_path
+        self.buffer_seconds = buffer_seconds
+        self.fps = fps
+        self.frame_buffer = deque(maxlen=buffer_seconds * fps)
+        self.saving_video = False
+        self.detection_cooldown = 5  # Segundos entre detecções
+        self.last_detection_time = 0
+        
+        # Índices dos keypoints do YOLOv8 Pose
+        self.NOSE = 0
+        self.LEFT_EYE = 1
+        self.RIGHT_EYE = 2
+        self.LEFT_EAR = 3
+        self.RIGHT_EAR = 4
+        self.LEFT_SHOULDER = 5
+        self.RIGHT_SHOULDER = 6
+        self.LEFT_ELBOW = 7
+        self.RIGHT_ELBOW = 8
+        self.LEFT_WRIST = 9
+        self.RIGHT_WRIST = 10
+        
+        # Inicializar Hailo
+        self.setup_hailo()
+        
+        # Inicializar câmera
+        self.setup_camera()
+        
+    def setup_hailo(self):
+        """Configura o dispositivo Hailo"""
+        # Carregar HEF
+        self.hef = HEF(self.hef_path)
+        
+        # Obter dispositivos Hailo disponíveis
+        self.target = ConfigureParams.create_from_hef(self.hef)
+        
+        # Configurar parâmetros de entrada
+        self.input_vstreams_params = InputVStreamParams.make(
+            self.hef, 
+            format_type=FormatType.FLOAT32
+        )
+        
+        # Configurar parâmetros de saída
+        self.output_vstreams_params = OutputVStreamParams.make(
+            self.hef,
+            format_type=FormatType.FLOAT32
+        )
+        
+        # Criar interface de streaming
+        self.input_vstream_info = self.hef.get_input_vstream_infos()[0]
+        self.output_vstream_info = self.hef.get_output_vstream_infos()[0]
+        
+        # Configurar rede
+        self.configured_infer_model = self.target.configure(self.hef)
+        self.network_name = self.hef.get_network_group_names()[0]
+        
+    def setup_camera(self):
+        """Configura a PiCamera2"""
+        self.camera = Picamera2()
+        
+        # Configurar para 640x640 (entrada padrão do YOLO)
+        config = self.camera.create_preview_configuration(
+            main={"size": (640, 640), "format": "RGB888"},
+            controls={"FrameRate": self.fps}
+        )
+        self.camera.configure(config)
+        self.camera.start()
+        
+    def preprocess_frame(self, frame):
+        """Preprocessa o frame para o modelo"""
+        # Redimensionar se necessário
+        if frame.shape[:2] != (640, 640):
+            frame = cv2.resize(frame, (640, 640))
+        
+        # Normalizar para [0, 1]
+        frame = frame.astype(np.float32) / 255.0
+        
+        # Adicionar dimensão do batch
+        frame = np.expand_dims(frame, axis=0)
+        
+        return frame
     
-    # Map the buffer to access its data
-    success, map_info = buffer.map(Gst.MapFlags.READ)
-    if not success:
-        print("Failed to map buffer")
-        return None
+    def postprocess_output(self, output):
+        """Processa a saída do modelo para extrair poses"""
+        # A saída do YOLOv8 Pose geralmente tem formato:
+        # [batch, num_detections, 56] onde 56 = 4 (bbox) + 1 (conf) + 17*3 (keypoints)
+        
+        poses = []
+        for detection in output[0]:
+            confidence = detection[4]
+            
+            if confidence > 0.5:  # Threshold de confiança
+                # Extrair keypoints (17 pontos x 3 valores: x, y, confiança)
+                keypoints = detection[5:].reshape(17, 3)
+                poses.append({
+                    'bbox': detection[:4],
+                    'confidence': confidence,
+                    'keypoints': keypoints
+                })
+        
+        return poses
     
-    try:
-        buffer_size = len(map_info.data)
+    def check_arms_crossed_overhead(self, keypoints):
+        """
+        Verifica se os braços estão cruzados acima da cabeça
         
-        # Check if buffer size matches expected RGB size
-        if buffer_size == expected_size:
-            # Perfect match - it's RGB data
-            frame_data = np.frombuffer(map_info.data, dtype=np.uint8)
-            frame = frame_data.reshape((height, width, 3))
-            frame_copy = frame.copy()  # Copy before unmapping
-            return frame_copy
+        Args:
+            keypoints: Array de keypoints (17x3)
             
-        elif buffer_size == width * height * 4:
-            # RGBA data - extract RGB channels
-            frame_data = np.frombuffer(map_info.data, dtype=np.uint8)
-            frame = frame_data.reshape((height, width, 4))
-            frame_copy = frame[:, :, :3].copy()  # Take only RGB, ignore A
-            return frame_copy
-            
-        elif buffer_size > expected_size:
-            # Buffer is larger - try to extract RGB from the beginning
-            print(f"Buffer larger than expected: {buffer_size} > {expected_size}")
-            frame_data = np.frombuffer(map_info.data[:expected_size], dtype=np.uint8)
-            frame = frame_data.reshape((height, width, 3))
-            frame_copy = frame.copy()
-            return frame_copy
-            
-        else:
-            print(f"Buffer too small: {buffer_size} < {expected_size}")
-            return None
-            
-    except Exception as e:
-        print(f"Error extracting frame: {e}")
-        return None
-    finally:
-        buffer.unmap(map_info)
-
-# -----------------------------------------------------------------------------------------------
-# Callback class
-# -----------------------------------------------------------------------------------------------
-class user_app_callback_class(app_callback_class):
-    def __init__(self):
-        super().__init__()
-        # Calculate max buffer size based on BUFFER_FPS instead of actual FPS
-        self.max_buffer_frames = BUFFER_FPS * BUFFER_SECONDS  # 30 * 20 = 600 frames max
-        self.frame_buffer = deque(maxlen=self.max_buffer_frames)
-        self.is_recording = False
-        self.pose_start_time = None
-        self.pose_triggered_this_cycle = False
-        self.buffer_lock = threading.Lock()
-        self.frame_count = 0
-        self.frames_captured = 0
-        self.last_fps_time = time.time()
-        self.fps = 30.0  # Default FPS
-        self.last_buffer_frame_time = 0  # For frame skipping
-        self.frame_skip_interval = 1.0 / BUFFER_FPS  # Store frames at BUFFER_FPS rate
+        Returns:
+            bool: True se os braços estão cruzados acima da cabeça
+        """
+        # Verificar se os keypoints necessários têm confiança suficiente
+        min_confidence = 0.3
         
-        # Memory monitoring
-        self.last_memory_check = time.time()
-        self.memory_warning_shown = False
+        # Pontos necessários
+        left_wrist = keypoints[self.LEFT_WRIST]
+        right_wrist = keypoints[self.RIGHT_WRIST]
+        left_shoulder = keypoints[self.LEFT_SHOULDER]
+        right_shoulder = keypoints[self.RIGHT_SHOULDER]
+        nose = keypoints[self.NOSE]
         
-    def update_fps(self):
-        """Calculate current FPS."""
-        current_time = time.time()
-        if current_time - self.last_fps_time >= 1.0:
-            self.fps = self.frame_count / (current_time - self.last_fps_time)
-            self.frame_count = 0
-            self.last_fps_time = current_time
-            print(f"Current FPS: {self.fps:.1f}, Buffer: {len(self.frame_buffer)}/{self.max_buffer_frames} frames")
-        return self.fps
+        # Verificar confiança
+        if (left_wrist[2] < min_confidence or 
+            right_wrist[2] < min_confidence or
+            left_shoulder[2] < min_confidence or
+            right_shoulder[2] < min_confidence or
+            nose[2] < min_confidence):
+            return False
         
-    def should_store_frame(self):
-        """Determine if current frame should be stored based on target buffer FPS."""
-        current_time = time.time()
-        if current_time - self.last_buffer_frame_time >= self.frame_skip_interval:
-            self.last_buffer_frame_time = current_time
+        # Verificar se os pulsos estão acima da cabeça
+        head_y = nose[1]
+        if left_wrist[1] > head_y or right_wrist[1] > head_y:
+            return False
+        
+        # Verificar se os braços estão cruzados
+        # (pulso esquerdo à direita do ombro direito e vice-versa)
+        if (left_wrist[0] > right_shoulder[0] and 
+            right_wrist[0] < left_shoulder[0]):
             return True
+        
         return False
+    
+    def save_video_buffer(self):
+        """Salva o buffer de vídeo em um arquivo"""
+        if self.saving_video:
+            return
         
-    def pulse_led(self, duration=3.0):
-        if not LED_AVAILABLE: return
-        print(f"LED ON for {duration} seconds.")
-        led_line.set_value(1)
-        t = threading.Timer(duration, lambda: led_line.set_value(0))
-        t.daemon = True
-        t.start()
-
-    def save_video_from_buffer(self):
-        with self.buffer_lock:
-            if self.is_recording or len(self.frame_buffer) == 0:
-                print(f"Cannot save: Recording={self.is_recording}, Buffer size={len(self.frame_buffer)}")
-                return
-            self.is_recording = True
-            frames_to_save = list(self.frame_buffer)
-
+        self.saving_video = True
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = os.path.join(RECORDING_FOLDER, f"{FILE_PREFIX}{timestamp}.avi")
-        duration = len(frames_to_save) / BUFFER_FPS
-        print(f"Saving {len(frames_to_save)} frames to {filename} (approximately {duration:.1f} seconds)")
+        filename = f"arms_crossed_{timestamp}.mp4"
         
-        thread = threading.Thread(target=self._write_video, args=(filename, frames_to_save))
-        thread.daemon = True
-        thread.start()
-
-    def _write_video(self, filename, frames):
+        # Criar cópia do buffer para não interferir na captura
+        frames_to_save = list(self.frame_buffer)
+        
+        # Salvar em thread separada
+        def save_thread():
+            fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+            out = cv2.VideoWriter(filename, fourcc, self.fps, (640, 640))
+            
+            for frame in frames_to_save:
+                # Converter RGB para BGR para o OpenCV
+                frame_bgr = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+                out.write(frame_bgr)
+            
+            out.release()
+            print(f"Vídeo salvo: {filename}")
+            self.saving_video = False
+        
+        threading.Thread(target=save_thread).start()
+    
+    def run_inference(self, frame):
+        """Executa inferência no frame"""
+        # Preprocessar
+        input_data = self.preprocess_frame(frame)
+        
+        # Criar bindings
+        with InferVStreams(self.configured_infer_model, self.input_vstreams_params, 
+                          self.output_vstreams_params) as infer_pipeline:
+            
+            # Preparar dados de entrada
+            input_dict = {self.input_vstream_info.name: input_data}
+            
+            # Executar inferência
+            with self.configured_infer_model.activate(self.network_name):
+                output = infer_pipeline.infer(input_dict)
+                
+        # Processar saída
+        output_array = output[self.output_vstream_info.name]
+        poses = self.postprocess_output(output_array)
+        
+        return poses
+    
+    def draw_pose(self, frame, poses):
+        """Desenha as poses detectadas no frame"""
+        for pose in poses:
+            keypoints = pose['keypoints']
+            
+            # Desenhar conexões do esqueleto
+            connections = [
+                (5, 6),   # ombros
+                (5, 7),   # ombro esquerdo - cotovelo
+                (7, 9),   # cotovelo esquerdo - pulso
+                (6, 8),   # ombro direito - cotovelo
+                (8, 10),  # cotovelo direito - pulso
+            ]
+            
+            for connection in connections:
+                pt1_idx, pt2_idx = connection
+                pt1 = keypoints[pt1_idx]
+                pt2 = keypoints[pt2_idx]
+                
+                if pt1[2] > 0.3 and pt2[2] > 0.3:
+                    cv2.line(frame, 
+                            (int(pt1[0] * 640), int(pt1[1] * 640)),
+                            (int(pt2[0] * 640), int(pt2[1] * 640)),
+                            (0, 255, 0), 2)
+            
+            # Desenhar keypoints
+            for i, kpt in enumerate(keypoints):
+                if kpt[2] > 0.3:
+                    cv2.circle(frame, 
+                              (int(kpt[0] * 640), int(kpt[1] * 640)), 
+                              3, (0, 0, 255), -1)
+        
+        return frame
+    
+    def run(self):
+        """Loop principal do detector"""
+        print("Iniciando detecção de braços cruzados...")
+        print(f"Buffer de vídeo: {self.buffer_seconds} segundos")
+        print("Pressione 'q' para sair")
+        
         try:
-            if not frames:
-                print("No frames to write!")
-                return
+            while True:
+                # Capturar frame
+                frame = self.camera.capture_array()
                 
-            # Get original dimensions from first frame
-            h, w = frames[0].shape[:2]
-            
-            # Scale back to original size if needed
-            if BUFFER_SCALE < 1.0:
-                w = int(w / BUFFER_SCALE)
-                h = int(h / BUFFER_SCALE)
-            
-            fourcc = cv2.VideoWriter_fourcc(*'XVID')
-            writer = cv2.VideoWriter(filename, fourcc, BUFFER_FPS, (w, h))
-            
-            if not writer.isOpened():
-                print(f"Error: Could not open video writer")
-                return
+                # Adicionar ao buffer
+                self.frame_buffer.append(frame.copy())
                 
-            for i, frame in enumerate(frames):
-                # Scale frame back to original size if it was scaled down
-                if BUFFER_SCALE < 1.0:
-                    frame = cv2.resize(frame, (w, h), interpolation=cv2.INTER_LINEAR)
+                # Executar inferência
+                poses = self.run_inference(frame)
                 
-                # Convert RGB to BGR for OpenCV
-                bgr_frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
-                writer.write(bgr_frame)
+                # Verificar cada pose detectada
+                current_time = time.time()
+                for pose in poses:
+                    if self.check_arms_crossed_overhead(pose['keypoints']):
+                        # Verificar cooldown
+                        if current_time - self.last_detection_time > self.detection_cooldown:
+                            print("Braços cruzados detectados! Salvando vídeo...")
+                            self.save_video_buffer()
+                            self.last_detection_time = current_time
                 
-                # Progress update
-                if i % 50 == 0:
-                    print(f"Writing frame {i}/{len(frames)}...")
-                    
-            writer.release()
-            print(f"Video saved successfully: {filename}")
-            
-            # Force garbage collection after saving
-            gc.collect()
-            
-        except Exception as e:
-            print(f"Error writing video: {e}")
-            import traceback
-            traceback.print_exc()
-        finally:
-            self.is_recording = False
-
-    def check_memory_usage(self):
-        """Monitor memory usage and warn if getting high."""
-        current_time = time.time()
-        if current_time - self.last_memory_check > 5.0:  # Check every 5 seconds
-            self.last_memory_check = current_time
-            try:
-                memory_mb = psutil.Process().memory_info().rss / 1024 / 1024
-                memory_percent = psutil.Process().memory_percent()
+                # Desenhar poses para visualização
+                display_frame = self.draw_pose(frame.copy(), poses)
                 
-                if memory_percent > 70 and not self.memory_warning_shown:
-                    print(f"WARNING: High memory usage: {memory_mb:.1f}MB ({memory_percent:.1f}%)")
-                    self.memory_warning_shown = True
-                    
-                    # Emergency buffer clear if memory is critically high
-                    if memory_percent > 85:
-                        print("CRITICAL: Memory usage too high! Clearing oldest 25% of buffer...")
-                        with self.buffer_lock:
-                            # Keep only the most recent 75% of frames
-                            keep_size = int(len(self.frame_buffer) * 0.75)
-                            temp_frames = list(self.frame_buffer)[-keep_size:]
-                            self.frame_buffer.clear()
-                            self.frame_buffer.extend(temp_frames)
-                        gc.collect()
-                        
-                elif memory_percent < 60:
-                    self.memory_warning_shown = False
-                    
-            except Exception as e:
-                print(f"Memory check error: {e}")
-
-# -----------------------------------------------------------------------------------------------
-# Callback function
-# -----------------------------------------------------------------------------------------------
-def app_callback(pad, info, user_data):
-    buffer = info.get_buffer()
-    if not buffer:
-        return Gst.PadProbeReturn.OK
-
-    user_data.increment()
-    user_data.frame_count += 1
-    fps = user_data.update_fps()
-    
-    # Check memory usage periodically
-    user_data.check_memory_usage()
-    
-    # Get video properties
-    width, height = 1280, 720
-    caps_result = get_caps_from_pad(pad)
-    if isinstance(caps_result, tuple) and len(caps_result) >= 3:
-        format_str, width, height = caps_result
-        if user_data.frame_count == 1:
-            print(f"Video properties: {width}x{height}, format: {format_str}")
-            print(f"Buffer will store frames at {BUFFER_FPS} FPS, scaled to {BUFFER_SCALE*100}%")
-    
-    # Only process frame extraction if we should store this frame
-    should_store = user_data.should_store_frame()
-    frame = None
-    
-    if should_store:
-        # Extract frame - try Hailo method first, then direct extraction
-        # Method 1: Try the Hailo library function
-        try:
-            frame = get_numpy_from_buffer(buffer, 'RGB', width, height)
-            if frame is not None and user_data.frames_captured == 0:
-                print(f"Success: get_numpy_from_buffer worked!")
-        except Exception:
-            pass
-        
-        # Method 2: Direct extraction
-        if frame is None:
-            frame = extract_rgb_frame_from_buffer(buffer, width, height)
-            if frame is not None and user_data.frames_captured == 0:
-                print(f"Success: Direct buffer extraction worked! Shape: {frame.shape}")
-    
-    # Add frame to buffer if we got one and should store it
-    if frame is not None and should_store:
-        # Scale down frame to save memory
-        if BUFFER_SCALE < 1.0:
-            scaled_height = int(height * BUFFER_SCALE)
-            scaled_width = int(width * BUFFER_SCALE)
-            scaled_frame = cv2.resize(frame, (scaled_width, scaled_height), interpolation=cv2.INTER_AREA)
-        else:
-            scaled_frame = frame
-            
-        with user_data.buffer_lock:
-            user_data.frame_buffer.append(scaled_frame.copy())
-            user_data.frames_captured += 1
-        
-        if user_data.frames_captured % 50 == 0:
-            buffer_len = len(user_data.frame_buffer)
-            try:
-                memory_mb = psutil.Process().memory_info().rss / 1024 / 1024
-                print(f"Buffer: {buffer_len}/{user_data.max_buffer_frames} frames, Memory: {memory_mb:.1f}MB")
-            except:
-                print(f"Buffer: {buffer_len}/{user_data.max_buffer_frames} frames")
-    
-    # Process pose detection (always do this, not just when storing frames)
-    roi = hailo.get_roi_from_buffer(buffer)
-    detections = roi.get_objects_typed(hailo.HAILO_DETECTION)
-    arms_crossed_detected = False
-    
-    for detection in detections:
-        if detection.get_label() == "person":
-            landmarks = detection.get_objects_typed(hailo.HAILO_LANDMARKS)
-            if not landmarks: continue
-            
-            points = landmarks[0].get_points()
-            keypoints = {}
-            keypoint_indices = {
-                'nose': 0, 'left_wrist': 9, 'right_wrist': 10,
-                'left_shoulder': 5, 'right_shoulder': 6
-            }
-            
-            bbox = detection.get_bbox()
-            for name, idx in keypoint_indices.items():
-                point = points[idx]
-                if point.confidence() > POSE_CONFIDENCE_THRESHOLD:
-                    keypoints[name] = (
-                        int((point.x() * bbox.width() + bbox.xmin()) * width),
-                        int((point.y() * bbox.height() + bbox.ymin()) * height)
-                    )
-            
-            if all(k in keypoints for k in keypoint_indices.keys()):
-                lw, rw = keypoints['left_wrist'], keypoints['right_wrist']
-                ls, rs = keypoints['left_shoulder'], keypoints['right_shoulder']
-                ns = keypoints['nose']
+                # Converter RGB para BGR para exibição
+                display_frame_bgr = cv2.cvtColor(display_frame, cv2.COLOR_RGB2BGR)
                 
-                wrists_crossed = lw[0] > rs[0] and rw[0] < ls[0]
-                arms_above_head = lw[1] < ns[1] and rw[1] < ns[1]
+                # Adicionar texto de status
+                status = "Gravando..." if self.saving_video else "Monitorando"
+                cv2.putText(display_frame_bgr, status, (10, 30), 
+                           cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
                 
-                if wrists_crossed and arms_above_head:
-                    arms_crossed_detected = True
+                # Mostrar frame
+                cv2.imshow('Pose Detection', display_frame_bgr)
+                
+                # Verificar saída
+                if cv2.waitKey(1) & 0xFF == ord('q'):
                     break
+                    
+        except KeyboardInterrupt:
+            print("\nEncerrando...")
+        finally:
+            self.cleanup()
     
-    # Handle pose detection timing
-    if arms_crossed_detected:
-        if user_data.pose_start_time is None:
-            user_data.pose_start_time = time.time()
-            print("Arms crossed pose detected!")
-        elif time.time() - user_data.pose_start_time >= POSE_DURATION_SECONDS:
-            if not user_data.pose_triggered_this_cycle:
-                buffer_len = len(user_data.frame_buffer)
-                print(f"Pose held for {POSE_DURATION_SECONDS}s! Triggering save. Buffer: {buffer_len} frames")
-                user_data.pulse_led()
-                user_data.save_video_from_buffer()
-                user_data.pose_triggered_this_cycle = True
-    else:
-        if user_data.pose_start_time is not None:
-            print("Pose broken")
-            user_data.pose_start_time = None
-            user_data.pose_triggered_this_cycle = False
-    
-    # Display handling - use original frame or get new one if needed
-    if user_data.use_frame:
-        display_frame = frame
-        if display_frame is None and arms_crossed_detected:
-            # Need to extract frame for display
-            try:
-                display_frame = get_numpy_from_buffer(buffer, 'RGB', width, height)
-            except:
-                display_frame = extract_rgb_frame_from_buffer(buffer, width, height)
-        
-        if display_frame is not None:
-            if arms_crossed_detected:
-                cv2.putText(display_frame, "ARMS CROSSED!", (50, 50), 
-                           cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
-            
-            # Convert to BGR for display
-            bgr_frame = cv2.cvtColor(display_frame, cv2.COLOR_RGB2BGR)
-            user_data.set_frame(bgr_frame)
-    
-    return Gst.PadProbeReturn.OK
+    def cleanup(self):
+        """Limpa recursos"""
+        self.camera.stop()
+        cv2.destroyAllWindows()
+        print("Detector encerrado.")
 
-# -----------------------------------------------------------------------------------------------
-# Main
-# -----------------------------------------------------------------------------------------------
 if __name__ == "__main__":
-    # Initialize GStreamer
-    Gst.init(None)
+    # Caminho para o arquivo HEF
+    HEF_PATH = "yolov8s_pose.hef"
     
-    user_data = user_app_callback_class()
-    user_data.use_frame = True
-    
-    print("Starting Hailo pose detection app...")
-    print(f"Buffer will hold up to {BUFFER_SECONDS} seconds of video at {BUFFER_FPS} FPS")
-    print(f"Frames will be scaled to {BUFFER_SCALE*100}% to save memory")
-    print(f"Maximum buffer size: {user_data.max_buffer_frames} frames")
-    print(f"Estimated memory usage: ~{(user_data.max_buffer_frames * 640 * 360 * 3) / (1024*1024):.0f}MB")
-    print(f"Pose must be held for {POSE_DURATION_SECONDS} seconds to trigger recording")
-    print("Cross your arms above your head to trigger recording!")
-    
-    try:
-        memory_mb = psutil.Process().memory_info().rss / 1024 / 1024
-        print(f"Initial memory usage: {memory_mb:.1f}MB")
-    except:
-        pass
-    
-    app = GStreamerPoseEstimationApp(app_callback, user_data)
-    app.run()
-    
-    print(f"\nShutting down...")
-    print(f"Total frames processed: {user_data.frame_count}")
-    print(f"Frames captured to buffer: {user_data.frames_captured}")
-    
-    if LED_AVAILABLE:
-        led_line.set_value(0)
-        led_line.release()
-        chip.close()
-        print("GPIO cleaned up.")
+    # Criar e executar detector
+    detector = PoseDetector(HEF_PATH, buffer_seconds=20, fps=30)
+    detector.run()
