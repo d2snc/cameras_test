@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Hailo Pose-Estimation – braços cruzados
-► buffer circular redimensionável • gravação em thread sem cópias
-Jun 2025 (rev. 2, “RAM-safe”)
+Hailo Pose-Estimation – braços cruzados  
+► buffer circular sem cópias • gravação MJPG • run_async() (GLib fix)
+Jun 2025  rev. 2a
 """
 
 import gi, os, cv2, hailo, time, threading, numpy as np, psutil, gc
@@ -20,18 +20,18 @@ from hailo_apps_infra.hailo_rpi_common import (
 )
 from hailo_apps_infra.pose_estimation_pipeline import GStreamerPoseEstimationApp
 
-# ───── CONFIGURAÇÃO GERAL ──────────────────────────────────────────────────
-BUFFER_SECONDS       = 20          # quanto vídeo manter em RAM
-DETECTION_INTERVAL   = 0.25        # detecções/s (≈4 Hz)
-POSE_HOLD_SECONDS    = 0.8         # seg p/ acionar gravação
+# ───── CONFIGURAÇÃO ────────────────────────────────────────────────────────
+BUFFER_SECONDS       = 20
+DETECTION_INTERVAL   = 0.25           # ~4 Hz
+POSE_HOLD_SECONDS    = 0.8
 OUTPUT_DIR           = "recordings"
 FILE_PREFIX_AUTO     = "arms_"
 FILE_PREFIX_MANUAL   = "manual_"
-MAX_RECORD_FPS       = 20          # fps do AVI salvo
-BUFFER_SCALE         = 0.4         # 0.4 → 512 × 288 c/ entrada 1280 × 720
-CODEC_FOURCC         = cv2.VideoWriter_fourcc(*'MJPG')  # leve em RAM
+MAX_RECORD_FPS       = 20
+BUFFER_SCALE         = 0.4
+CODEC_FOURCC         = cv2.VideoWriter_fourcc(*"MJPG")
 
-# ───── LED (opcional) ──────────────────────────────────────────────────────
+# ───── LED opcional ───────────────────────────────────────────────────────
 LED_AVAILABLE = False
 try:
     import gpiod
@@ -46,25 +46,28 @@ except Exception as e:
     print("[LED] desativado:", e)
 
 def pulse_led(sec=3.0):
-    if not LED_AVAILABLE: return
+    if not LED_AVAILABLE:
+        return
     _led.set_value(1)
     t = threading.Timer(sec, lambda: _led.set_value(0))
     t.daemon = True
     t.start()
 
-# ───── Fallback RGB extraction ─────────────────────────────────────────────
+# ───── Fallback RGB extraction ────────────────────────────────────────────
 def gstbuffer_to_rgb(buf, w, h):
     ok, info = buf.map(Gst.MapFlags.READ)
-    if not ok: return None
+    if not ok:
+        return None
     try:
         exp = w * h * 3
-        if len(info.data) < exp: return None
+        if len(info.data) < exp:
+            return None
         arr = np.frombuffer(info.data[:exp], dtype=np.uint8).reshape((h, w, 3))
         return arr.copy()
     finally:
         buf.unmap(info)
 
-# ───── Estado global (herda utilidades da Hailo) ───────────────────────────
+# ───── Estado global ──────────────────────────────────────────────────────
 class State(app_callback_class):
     def __init__(self):
         super().__init__()
@@ -73,7 +76,6 @@ class State(app_callback_class):
         self.frames    = deque(maxlen=int(self.fps_est * self.buf_sec))
         self.stamps    = deque(maxlen=int(self.fps_est * self.buf_sec))
         self.lock      = threading.Lock()
-
         # detecção & gravação
         self.pose_start = None
         self.pose_ready = False
@@ -85,10 +87,12 @@ class State(app_callback_class):
 S = State()
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-# ───── Thread de gravação ──────────────────────────────────────────────────
+# ───── Thread de gravação ─────────────────────────────────────────────────
 def writer_thread(frames, fname, fps):
-    try: os.nice(-10)
-    except: pass
+    try:
+        os.nice(-10)
+    except:
+        pass
     if not frames:
         S.recording = False
         return
@@ -96,13 +100,11 @@ def writer_thread(frames, fname, fps):
     if BUFFER_SCALE < 1.0:
         w, h = int(w / BUFFER_SCALE), int(h / BUFFER_SCALE)
     fps = max(10.0, min(fps, MAX_RECORD_FPS))
-
-    vw = cv2.VideoWriter(fname, CODEC_FOURCC, fps, (w, h))
+    vw  = cv2.VideoWriter(fname, CODEC_FOURCC, fps, (w, h))
     if not vw.isOpened():
-        print("[ERR] VideoWriter não abriu")
+        print("[ERR] VideoWriter não iniciou")
         S.recording = False
         return
-
     for i, f in enumerate(frames):
         if BUFFER_SCALE < 1.0:
             f = cv2.resize(f, (w, h), interpolation=cv2.INTER_LINEAR)
@@ -110,19 +112,19 @@ def writer_thread(frames, fname, fps):
         if i and i % max(1, len(frames) // 10) == 0:
             print(f"[SAVE] {i / len(frames) * 100:.0f}%…")
     vw.release()
-    print("[SAVE] ok:", fname)
+    print("[SAVE] OK:", fname)
     S.recording = False
     gc.collect()
 
-# ───── Salvar buffer (sem cópias em RAM) ───────────────────────────────────
 def save_buffer(manual=False):
     if S.recording:
         return
     with S.lock:
         if not S.frames:
             return
-        frames_for_write = list(S.frames)         # referências ➜ sem .copy()
-        S.frames.clear(); S.stamps.clear()        # libera RAM ANTES da gravação
+        frames_for_write = list(S.frames)   # referências, sem cópia
+        S.frames.clear()
+        S.stamps.clear()
     tag   = FILE_PREFIX_MANUAL if manual else FILE_PREFIX_AUTO
     fname = os.path.join(OUTPUT_DIR,
                          f"{tag}{datetime.now():%Y%m%d_%H%M%S}.avi")
@@ -132,31 +134,30 @@ def save_buffer(manual=False):
                      daemon=True).start()
     pulse_led()
 
-# ───── Callback GStreamer ─────────────────────────────────────────────────
-def app_callback(pad, info, _user):
+# ───── Callback GStreamer ────────────────────────────────────────────────
+def app_callback(pad, info, _):
     buf = info.get_buffer()
     if not buf:
         return Gst.PadProbeReturn.OK
-
     now = time.time()
-    S.increment()                       # contador da infra
+    S.increment()                    # contador interno da infra
 
-    # --- FPS médio + ajuste do deque --------------------------------------
-    if not hasattr(app_callback, "_last_fps"):
-        app_callback._last_fps, app_callback._cnt = now, 0
+    # --- FPS médio / resize deque ----------------------------------------
+    if not hasattr(app_callback, "_t0"):
+        app_callback._t0, app_callback._cnt = now, 0
     app_callback._cnt += 1
-    if now - app_callback._last_fps >= 1.0:
-        S.fps_est = app_callback._cnt / (now - app_callback._last_fps)
-        app_callback._cnt  = 0
-        app_callback._last_fps = now
+    if now - app_callback._t0 >= 1.0:
+        S.fps_est = app_callback._cnt / (now - app_callback._t0)
+        app_callback._cnt = 0
+        app_callback._t0  = now
         new_len = int(S.fps_est * S.buf_sec)
         if new_len != S.frames.maxlen:
             with S.lock:
                 S.frames = deque(S.frames, maxlen=new_len)
                 S.stamps = deque(S.stamps, maxlen=new_len)
-            print(f"[BUF] → {new_len} quadros ({S.buf_sec}s @ {S.fps_est:.1f}fps)")
+            print(f"[BUF] → {new_len} quadros ({S.buf_sec}s @ {S.fps_est:.1f} fps)")
 
-    # --- extrai frame somente se necessário --------------------------------
+    # --- extrai frame se necessário --------------------------------------
     need_frame = (BUFFER_SCALE < 1.0) or \
                  (now - getattr(app_callback, "_last_det", 0) < DETECTION_INTERVAL)
     frame = None
@@ -175,7 +176,7 @@ def app_callback(pad, info, _user):
             S.frames.append(frame)
             S.stamps.append(now)
 
-    # --- detecção (sub-amostrada) -----------------------------------------
+    # --- detecção sub-amostrada ------------------------------------------
     if now - getattr(app_callback, "_last_det", 0) >= DETECTION_INTERVAL:
         app_callback._last_det = now
         roi  = hailo.get_roi_from_buffer(buf)
@@ -193,16 +194,15 @@ def app_callback(pad, info, _user):
                 continue
             fmt, w, h = get_caps_from_pad(pad)
             bbox = d.get_bbox()
-            def XY(p):
+            def xy(p):
                 return ((p.x() * bbox.width() + bbox.xmin()) * w,
                         (p.y() * bbox.height() + bbox.ymin()) * h)
-            nose, ls, rs, lw, rw = map(XY, (pts[i] for i in need))
+            nose, ls, rs, lw, rw = map(xy, (pts[i] for i in need))
             crossed = lw[0] > rs[0] and rw[0] < ls[0] and \
                       lw[1] < nose[1] and rw[1] < nose[1]
             if crossed:
                 break
         del roi, dets
-
         if crossed:
             if S.pose_start is None:
                 S.pose_start = now
@@ -216,17 +216,17 @@ def app_callback(pad, info, _user):
             S.pose_start = None
             S.pose_ready = False
 
-    # --- GC / RAM ----------------------------------------------------------
+    # --- GC quando necessário -------------------------------------------
     if S.get_count() % 200 == 0:
         rss = psutil.Process().memory_info().rss / 1024 / 1024
         if rss > 700:
             print(f"[MEM] {rss:.0f} MB → GC")
             gc.collect()
-
     return Gst.PadProbeReturn.OK
 
-# ───── Janela OpenCV / controles ─────────────────────────────────────────--
+# ───── UI OpenCV (executa na *main thread*) ───────────────────────────────
 def ui_loop():
+    cv2.startWindowThread()  # torna janela thread-safe em algumas builds
     print("[TECLAS] q  g  +  -")
     while True:
         with S.lock:
@@ -258,18 +258,19 @@ def ui_loop():
         time.sleep(0.003)
     cv2.destroyAllWindows()
 
-# ───── MAIN ────────────────────────────────────────────────────────────────
+# ───── MAIN ───────────────────────────────────────────────────────────────
 if __name__ == "__main__":
     print(f"[BOOT] buf={BUFFER_SECONDS}s det={1/DETECTION_INTERVAL:.1f}/s"
           f" scale={BUFFER_SCALE} codec=MJPG")
     Gst.init(None)
     app = GStreamerPoseEstimationApp(app_callback, S)
+
+    # run_async() lança GLib main-loop no contexto correto
+    app.run_async()
     try:
-        threading.Thread(target=app.run, daemon=True).start()
-        ui_loop()
+        ui_loop()          # roda na main-thread, usa imshow
     finally:
+        app.stop()
         if LED_AVAILABLE:
-            _led.set_value(0)
-            _led.release()
-            _chip.close()
+            _led.set_value(0); _led.release(); _chip.close()
         print("[EXIT] finalizado")
