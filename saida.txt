@@ -1,0 +1,12 @@
+usage: test_hailo.py [-h] --hef HEF [--fps FPS] [--width WIDTH]
+                     [--height HEIGHT] [--buffer BUFFER] [--show] [--picam]
+
+options:
+  -h, --help       show this help message and exit
+  --hef HEF
+  --fps FPS
+  --width WIDTH
+  --height HEIGHT
+  --buffer BUFFER
+  --show           Mostrar preview com OpenCV
+  --picam          Usar Picamera2 como fonte em vez de libcamerasrc
