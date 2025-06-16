@@ -12,6 +12,7 @@ import threading
 import time
 from picamera2 import Picamera2
 from hailo_platform import (
+    Device,
     HEF,
     ConfigureParams,
     InputVStreamParams,
@@ -66,7 +67,19 @@ class PoseDetector:
         self.hef = HEF(self.hef_path)
         
         # Obter dispositivos Hailo disponíveis
-        self.target = ConfigureParams.create_from_hef(self.hef)
+        # Para Hailo 8L no Raspberry Pi 5, geralmente é PCIe
+        self.devices = Device.scan_pcie()
+        if not self.devices:
+            raise RuntimeError("Nenhum dispositivo Hailo encontrado!")
+        
+        self.device = self.devices[0]
+        print(f"Usando dispositivo Hailo: {self.device}")
+        
+        # Configurar parâmetros com a interface correta
+        self.target = ConfigureParams.create_from_hef(
+            self.hef, 
+            interface=HailoStreamInterface.PCIe
+        )
         
         # Configurar parâmetros de entrada
         self.input_vstreams_params = InputVStreamParams.make(
@@ -85,7 +98,10 @@ class PoseDetector:
         self.output_vstream_info = self.hef.get_output_vstream_infos()[0]
         
         # Configurar rede
-        self.configured_infer_model = self.target.configure(self.hef)
+        self.configured_infer_model = self.device.configure(
+            self.hef,
+            self.target
+        )
         self.network_name = self.hef.get_network_group_names()[0]
         
     def setup_camera(self):
