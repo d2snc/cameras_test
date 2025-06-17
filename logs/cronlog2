@@ -11,14 +11,3 @@ WARNING: This is a development server. Do not use it in a production deployment.
  * Running on http://127.0.0.1:8000
  * Running on http://127.0.0.1:8000
 Press CTRL+C to quit
-100.68.216.5 - - [17/Jun/2025 03:24:57] "GET / HTTP/1.1" 200 -
-100.68.216.5 - - [17/Jun/2025 03:24:58] "GET /videos/gravacao_2025-06-16_17-28-48.mp4 HTTP/1.1" 206 -
-100.68.216.5 - - [17/Jun/2025 03:24:58] "GET /videos/gravacao_2025-06-16_17-28-48.mp4 HTTP/1.1" 200 -
-100.68.216.5 - - [17/Jun/2025 03:24:58] "GET /videos/gravacao_2025-06-16_17-28-37.mp4 HTTP/1.1" 200 -
-100.68.216.5 - - [17/Jun/2025 03:24:58] "GET /videos/gravacao_2025-06-16_17-28-37.mp4 HTTP/1.1" 206 -
-100.68.216.5 - - [17/Jun/2025 03:24:58] "GET /videos/gravacao_2025-06-16_17-28-48.mp4 HTTP/1.1" 206 -
-100.68.216.5 - - [17/Jun/2025 03:24:58] "GET /videos/gravacao_2025-06-16_17-28-48.mp4 HTTP/1.1" 206 -
-100.68.216.5 - - [17/Jun/2025 03:24:58] "GET /videos/gravacao_2025-06-16_17-28-37.mp4 HTTP/1.1" 206 -
-100.68.216.5 - - [17/Jun/2025 03:24:58] "GET /videos/gravacao_2025-06-16_17-28-48.mp4 HTTP/1.1" 206 -
-100.68.216.5 - - [17/Jun/2025 03:24:58] "GET /videos/gravacao_2025-06-16_17-28-37.mp4 HTTP/1.1" 206 -
-100.68.216.5 - - [17/Jun/2025 03:24:58] "GET /videos/gravacao_2025-06-16_17-28-37.mp4 HTTP/1.1" 206 -
