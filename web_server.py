@@ -7,7 +7,7 @@ import os
 app = Flask(__name__)
 
 # Define o diretório onde os vídeos estão salvos (o diretório atual)
-VIDEO_DIR = "."
+VIDEO_DIR = "/home/d2snc/Documents/cameras_test"
 
 @app.route('/')
 def index():

@@ -1,0 +1,15 @@
+/home/d2snc/Documents/cameras_test/start_pose_recorder.sh: 6: cd: can't cd to /home/d2snc/Documents/camera_test/
+Ativando ambiente Hailo para o gravador de pose...
+/home/d2snc/Documents/cameras_test/start_pose_recorder.sh: 10: source: not found
+Iniciando o script pose_re🚀 Servidor[0:00:12.222883436] [818] [1;32m INFO [1;37mCamera [1;34mcamera_manager.cpp:326 [0mlibcamera v0.5.0+59-d83ff0a4
+[0:00:12.230041140] [1449] [1;32m INFO [1;37mRPI [1;34mpisp.cpp:720 [0mlibpisp version v1.2.1 981977ff21f3 29-04-2025 (14:13:50)
+[0:00:12.240751196] [1449] [1;32m INFO [1;37mRPI [1;34mpisp.cpp:1179 [0mRegistered camera /base/axi/pcie@1000120000/rp1/i2c@88000/ov5647@36 to CFE device /dev/media3 and ISP device /dev/media1 using PiSP variant BCM2712_C0
+[0:00:12.868524732] [818] [1;32m INFO [1;37mCamera [1;34mcamera.cpp:1205 [0mconfiguring streams: (0) 1280x720-XRGB8888 (1) 640x640-RGB888 (2) 1920x1080-GBRG_PISP_COMP1
+[0:00:12.868666732] [1449] [1;32m INFO [1;37mRPI [1;34mpisp.cpp:1483 [0mSensor: /base/axi/pcie@1000120000/rp1/i2c@88000/ov5647@36 - Selected sensor format: 1920x1080-SGBRG10_1X10 - Selected CFE format: 1920x1080-PC1g
+qt.qpa.xcb: could not connect to display 
+qt.qpa.plugin: Could not load the Qt platform plugin "xcb" in "" even though it was found.
+This application failed to start because no Qt platform plugin could be initialized. Reinstalling the application may fix this problem.
+
+Available platform plugins are: eglfs, linuxfb, minimal, minimalegl, offscreen, vnc, wayland-egl, wayland, wayland-xcomposite-egl, wayland-xcomposite-glx, xcb.
+
+Aborted

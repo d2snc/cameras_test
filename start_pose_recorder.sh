@@ -11,4 +11,4 @@ source /home/d2snc/Documents/hailo-rpi5-examples/setup_env.sh
 
 echo "Iniciando o script pose_recorder.py..."
 # Executa o script Python. Não precisa mais de 'sudo' por causa do Passo 1.
-/usr/bin/python3 /home/d2snc/Documents/camera_test/pose_recorder.py
+/usr/bin/python3 /home/d2snc/Documents/cameras_test/pose_recorder.py
