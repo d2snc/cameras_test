@@ -29,39 +29,15 @@ last_predictions = None
 recording = False
 
 def check_arms_crossed_above_head(keypoints, joint_scores, threshold=0.6):
-    # Precisamos dos pulsos, nariz e ombros para uma verificação robusta
-    required_indices = [L_WRIST, R_WRIST, NOSE, L_SHOULDER, R_SHOULDER]
+    required_indices = [L_WRIST, R_WRIST, NOSE]
     if not all(joint_scores[i] > threshold for i in required_indices):
         return False
-
-    # Desempacota as coordenadas dos pontos-chave
     left_wrist_x, left_wrist_y = keypoints[L_WRIST]
     right_wrist_x, right_wrist_y = keypoints[R_WRIST]
     nose_x, nose_y = keypoints[NOSE]
-    left_shoulder_x, _ = keypoints[L_SHOULDER]
-    right_shoulder_x, _ = keypoints[R_SHOULDER]
-
-    # 1. Verifica se os dois pulsos estão acima do nariz
     arms_are_up = (left_wrist_y < nose_y) and (right_wrist_y < nose_y)
-    if not arms_are_up:
-        return False
-
-    # 2. Verifica se os braços estão cruzados
-    # O pulso esquerdo passou para o lado do ombro direito e vice-versa.
-    # Usar os ombros como referência é mais estável do que usar apenas o nariz.
-    arms_are_crossed = (left_wrist_x < right_shoulder_x) and (right_wrist_x > left_shoulder_x)
-    if not arms_are_crossed:
-        return False
-        
-    # 3. (Opcional, mas recomendado) Verifica se os pulsos estão próximos um do outro
-    # Isso evita falsos positivos se os braços estiverem abertos, mas cruzados em perspectiva
-    shoulder_width = abs(left_shoulder_x - right_shoulder_x)
-    wrist_distance = abs(left_wrist_x - right_wrist_x)
-    
-    # Exigimos que a distância entre os pulsos não seja maior que a largura dos ombros
-    wrists_are_close = wrist_distance < (shoulder_width * 1.5) # Permite uma margem
-    
-    return wrists_are_close # A decisão final depende desta condição
+    arms_are_crossed = (left_wrist_x < nose_x) and (right_wrist_x > nose_x)
+    return arms_are_up and arms_are_crossed
 
 def visualize_pose_estimation_result(results, image, model_size, detection_threshold=0.5, joint_threshold=0.5):
     image_size = (image.shape[1], image.shape[0])
