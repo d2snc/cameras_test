@@ -28,16 +28,51 @@ pose_detected_counter = 0
 last_predictions = None
 recording = False
 
-def check_arms_crossed_above_head(keypoints, joint_scores, threshold=0.6):
-    required_indices = [L_WRIST, R_WRIST, NOSE]
+def check_arms_crossed_above_head(keypoints, joint_scores, threshold=0.7):  # Aumentei o threshold
+    # Índices necessários incluindo ombros para melhor detecção
+    required_indices = [L_WRIST, R_WRIST, NOSE, L_SHOULDER, R_SHOULDER]
+    
+    # Verifica se todos os pontos necessários têm confiança suficiente
     if not all(joint_scores[i] > threshold for i in required_indices):
         return False
+    
+    # Extrai coordenadas
     left_wrist_x, left_wrist_y = keypoints[L_WRIST]
     right_wrist_x, right_wrist_y = keypoints[R_WRIST]
     nose_x, nose_y = keypoints[NOSE]
-    arms_are_up = (left_wrist_y < nose_y) and (right_wrist_y < nose_y)
-    arms_are_crossed = (left_wrist_x > nose_x) and (right_wrist_x < nose_x)
-    return arms_are_up and arms_are_crossed
+    left_shoulder_x, left_shoulder_y = keypoints[L_SHOULDER]
+    right_shoulder_x, right_shoulder_y = keypoints[R_SHOULDER]
+    
+    # 1. Verifica se AMBOS os pulsos estão bem acima do nariz (não apenas acima)
+    # Adiciona margem de segurança para garantir que os braços estão realmente levantados
+    margin_above_head = nose_y * 0.2  # 20% da altura do nariz como margem
+    arms_are_up = (left_wrist_y < (nose_y - margin_above_head)) and \
+                  (right_wrist_y < (nose_y - margin_above_head))
+    
+    # 2. Verifica se os braços estão REALMENTE cruzados
+    # O pulso esquerdo deve estar do lado direito do corpo E
+    # o pulso direito deve estar do lado esquerdo do corpo
+    body_center_x = (left_shoulder_x + right_shoulder_x) / 2
+    
+    # Usa o centro do corpo como referência em vez do nariz
+    left_arm_crossed_right = left_wrist_x > body_center_x
+    right_arm_crossed_left = right_wrist_x < body_center_x
+    
+    arms_are_crossed = left_arm_crossed_right and right_arm_crossed_left
+    
+    # 3. Verifica se os pulsos estão próximos um do outro (característica de cruzamento)
+    wrist_distance = abs(left_wrist_x - right_wrist_x)
+    shoulder_width = abs(left_shoulder_x - right_shoulder_x)
+    
+    # Os pulsos devem estar mais próximos que 50% da largura dos ombros
+    wrists_are_close = wrist_distance < (shoulder_width * 0.5)
+    
+    # 4. Verifica se os braços estão acima dos ombros
+    arms_above_shoulders = (left_wrist_y < left_shoulder_y) and \
+                          (right_wrist_y < right_shoulder_y)
+    
+    # Retorna True apenas se TODAS as condições forem atendidas
+    return arms_are_up and arms_are_crossed and wrists_are_close and arms_above_shoulders
 
 def visualize_pose_estimation_result(results, image, model_size, detection_threshold=0.5, joint_threshold=0.5):
     image_size = (image.shape[1], image.shape[0])
