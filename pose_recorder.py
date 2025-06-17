@@ -8,7 +8,7 @@ import subprocess
 import os
 from gpiozero import LED
 from pose_utils import postproc_yolov8_pose
-from picamera2 import MappedArray, Picamera2, Preview
+from picamera2 import MappedArray, Picamera2 #, Preview
 from picamera2.encoders import H264Encoder
 from picamera2.outputs import CircularOutput
 from picamera2.devices import Hailo

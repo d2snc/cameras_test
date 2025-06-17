@@ -3,7 +3,7 @@
 # Este script configura o ambiente e depois executa o gravador de pose.
 
 # Garante que estamos no diretório correto
-cd /home/d2snc/Documents/camera_test/
+cd /home/d2snc/Documents/cameras_test/
 
 echo "Ativando ambiente Hailo para o gravador de pose..."
 # Ativa o ambiente do Hailo
