@@ -67,7 +67,7 @@ try:
         model_size = lores_size = (model_w, model_h)
         config = picam2.create_video_configuration(main={'size': main_size, 'format': 'XRGB8888'}, lores={'size': lores_size, 'format': 'RGB888'}, controls={'FrameRate': 30})
         picam2.configure(config)
-        picam2.start_preview(Preview.QTGL, x=0, y=0, width=main_size[0] // 2, height=main_size[1] // 2)
+        #picam2.start_preview(Preview.QTGL, x=0, y=0, width=main_size[0] // 2, height=main_size[1] // 2)
 
         bitrate = 10000000
         encoder = H264Encoder(bitrate=bitrate)
@@ -76,7 +76,8 @@ try:
         circular_output = CircularOutput(buffersize=buffer_size_bytes)
 
         picam2.start_recording(encoder, circular_output)
-        picam2.pre_callback = draw_predictions
+        #Descomentar abaixo se quiser visualizar as predições na tela
+        #picam2.pre_callback = draw_predictions
 
         # pisca o led 3 vezes para indicar que o sistema está pronto
         for _ in range(3):
