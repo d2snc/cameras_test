@@ -36,7 +36,7 @@ def check_arms_crossed_above_head(keypoints, joint_scores, threshold=0.6):
     right_wrist_x, right_wrist_y = keypoints[R_WRIST]
     nose_x, nose_y = keypoints[NOSE]
     arms_are_up = (left_wrist_y < nose_y) and (right_wrist_y < nose_y)
-    arms_are_crossed = (left_wrist_x < nose_x) and (right_wrist_x > nose_x)
+    arms_are_crossed = (left_wrist_x > nose_x) and (right_wrist_x < nose_x)
     return arms_are_up and arms_are_crossed
 
 def visualize_pose_estimation_result(results, image, model_size, detection_threshold=0.5, joint_threshold=0.5):
