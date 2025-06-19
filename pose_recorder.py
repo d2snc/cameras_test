@@ -6,12 +6,11 @@ from datetime import datetime
 import subprocess
 import os
 import logging
+import numpy as np
 from gpiozero import LED
-from pose_utils import postproc_yolov8_pose
-from picamera2 import MappedArray, Picamera2 #, Preview
+from picamera2 import MappedArray, Picamera2
 from picamera2.encoders import H264Encoder
 from picamera2.outputs import CircularOutput
-from picamera2.devices import Hailo
 
 # Configurar logging mais detalhado
 logging.basicConfig(
@@ -64,18 +63,13 @@ def led_critical_error_signal():
         led.off()
         time.sleep(0.1)
 
-parser = argparse.ArgumentParser(description='Detecção de Pose com FFmpeg (Compatível com Pi 5)')
-parser.add_argument('-m', '--model', help="Caminho para o arquivo .hef", default="/usr/share/hailo-models/yolov8s_pose_h8l_pi.hef")
+parser = argparse.ArgumentParser(description='Sistema de Gravação com Detecção de Movimento')
 args = parser.parse_args()
 
-NOSE, L_EYE, R_EYE, L_EAR, R_EAR, L_SHOULDER, R_SHOULDER, L_ELBOW, R_ELBOW, \
-    L_WRIST, R_WRIST, L_HIP, R_HIP, L_KNEE, R_KNEE, L_ANKLE, R_ANKLE = range(17)
-
-JOINT_PAIRS = [[L_SHOULDER, R_SHOULDER], [L_SHOULDER, L_ELBOW], [L_ELBOW, L_WRIST], [R_SHOULDER, R_ELBOW], [R_ELBOW, R_WRIST], [L_SHOULDER, L_HIP], [R_SHOULDER, R_HIP], [L_HIP, R_HIP]]
-
-POSE_TRIGGER_FRAMES = 10
-pose_detected_counter = 0
-last_predictions = None
+# Variáveis para detecção de movimento
+MOTION_TRIGGER_FRAMES = 30  # Frames consecutivos com movimento para trigger
+motion_detected_counter = 0
+previous_frame = None
 recording = False
 
 def safe_remove_file(filepath):
@@ -348,36 +342,30 @@ def convert_to_mp4(input_file, output_file, fps=30):
     logger.error("Todas as tentativas de conversão falharam")
     return False
 
-def check_arms_crossed_above_head(keypoints, joint_scores, threshold=0.6):
-    required_indices = [L_WRIST, R_WRIST, NOSE]
-    if not all(joint_scores[i] > threshold for i in required_indices):
+def detect_motion(frame, threshold=1000):
+    """Detecta movimento simples baseado na diferença entre frames"""
+    global previous_frame
+    
+    # Converter para escala de cinza
+    gray = cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY)
+    gray = cv2.GaussianBlur(gray, (21, 21), 0)
+    
+    if previous_frame is None:
+        previous_frame = gray
         return False
-    left_wrist_x, left_wrist_y = keypoints[L_WRIST]
-    right_wrist_x, right_wrist_y = keypoints[R_WRIST]
-    nose_x, nose_y = keypoints[NOSE]
-    arms_are_up = (left_wrist_y < nose_y) and (right_wrist_y < nose_y)
-    arms_are_crossed = (left_wrist_x > nose_x) and (right_wrist_x < nose_x)
-    return arms_are_up and arms_are_crossed
-
-def visualize_pose_estimation_result(results, image, model_size, detection_threshold=0.5, joint_threshold=0.5):
-    image_size = (image.shape[1], image.shape[0])
-    def scale_coord(coord): return tuple([int(c * t / f) for c, f, t in zip(coord, model_size, image_size)])
-    if not results or 'bboxes' not in results: return
-    bboxes, scores, keypoints, joint_scores = (results['bboxes'][0], results['scores'][0], results['keypoints'][0], results['joint_scores'][0])
-    for detection_box, detection_score, detection_keypoints, detection_keypoints_score in zip(bboxes, scores, keypoints, joint_scores):
-        if detection_score[0] < detection_threshold: continue
-        coord_min, coord_max = scale_coord(detection_box[:2]), scale_coord(detection_box[2:])
-        cv2.rectangle(image, coord_min, coord_max, (0, 255, 0), 2)
-        joint_visible = detection_keypoints_score.flatten() > joint_threshold
-        for joint0_idx, joint1_idx in JOINT_PAIRS:
-            if joint_visible[joint0_idx] and joint_visible[joint1_idx]:
-                p1, p2 = scale_coord(detection_keypoints[joint0_idx]), scale_coord(detection_keypoints[joint1_idx])
-                cv2.line(image, p1, p2, (255, 0, 255), 3)
-
-def draw_predictions(request):
-    with MappedArray(request, 'main') as m:
-        if last_predictions:
-            visualize_pose_estimation_result(last_predictions, m.array, model_size)
+    
+    # Calcular diferença absoluta
+    frame_delta = cv2.absdiff(previous_frame, gray)
+    thresh = cv2.threshold(frame_delta, 25, 255, cv2.THRESH_BINARY)[1]
+    thresh = cv2.dilate(thresh, None, iterations=2)
+    
+    # Contar pixels brancos (movimento)
+    motion_pixels = cv2.countNonZero(thresh)
+    
+    # Atualizar frame anterior
+    previous_frame = gray
+    
+    return motion_pixels > threshold
 
 # Verificar FFmpeg antes de iniciar
 logger.info("Verificando FFmpeg...")
@@ -391,124 +379,116 @@ picam2 = Picamera2()
 try:
     logger.info("Inicializando sistema...")
     
-    with Hailo(args.model) as hailo:
-        main_size = (1280, 720)
-        model_h, model_w, _ = hailo.get_input_shape()
-        model_size = lores_size = (model_w, model_h)
-        config = picam2.create_video_configuration(main={'size': main_size, 'format': 'XRGB8888'}, lores={'size': lores_size, 'format': 'RGB888'}, controls={'FrameRate': 30})
-        picam2.configure(config)
+    main_size = (1280, 720)
+    config = picam2.create_video_configuration(
+        main={'size': main_size, 'format': 'XRGB8888'}, 
+        lores={'size': (320, 240), 'format': 'RGB888'},  # Para detecção de movimento
+        controls={'FrameRate': 30}
+    )
+    picam2.configure(config)
+    
+    # Configuração do buffer
+    fps = 30
+    target_duration_seconds = 60
+    bitrate = 2000000
+    encoder = H264Encoder(bitrate=bitrate)
+    
+    # Buffer generoso para garantir mais de 60 segundos
+    buffer_size_bytes = 150 * 1024 * 1024  # 150 MB
+    circular_output = CircularOutput(buffersize=buffer_size_bytes)
+    picam2.start_recording(encoder, circular_output)
+    
+    logger.info(f"Gravação iniciada - Buffer: {buffer_size_bytes / (1024*1024):.0f} MB, Bitrate: {bitrate}")
+    
+    # LED indica sistema iniciado com sucesso
+    logger.info("✅ Sistema iniciado com sucesso")
+    led_startup_signal()
+    
+    logger.info("🚀 Sistema pronto. Aguardando detecção de movimento...")
+    
+    while True:
+        # Capturar frame em baixa resolução para detecção de movimento
+        frame = picam2.capture_array('lores')
         
-        # Configuração do buffer
-        fps = 30
-        target_duration_seconds = 60
-        bitrate = 2000000
-        encoder = H264Encoder(bitrate=bitrate)
+        # Detectar movimento
+        motion_detected = detect_motion(frame)
         
-        # Buffer generoso para garantir mais de 60 segundos
-        buffer_size_bytes = 150 * 1024 * 1024  # 150 MB
-        circular_output = CircularOutput(buffersize=buffer_size_bytes)
-        picam2.start_recording(encoder, circular_output)
-        
-        logger.info(f"Gravação iniciada - Buffer: {buffer_size_bytes / (1024*1024):.0f} MB, Bitrate: {bitrate}")
-        
-        # LED indica sistema iniciado com sucesso
-        logger.info("✅ Sistema iniciado com sucesso")
-        led_startup_signal()
-        
-        logger.info("🚀 Sistema pronto. Aguardando detecção da pose...")
-        
-        while True:
-            frame = picam2.capture_array('lores')
-            raw_detections = hailo.run(frame)
-            last_predictions = postproc_yolov8_pose(1, raw_detections, model_size)
+        if motion_detected and not recording:
+            motion_detected_counter += 1
+            if motion_detected_counter % 10 == 0:  # Log a cada 10 frames
+                logger.debug(f"Movimento detectado por {motion_detected_counter} frames")
+        else:
+            motion_detected_counter = 0
             
-            pose_found_this_frame = False
-            if last_predictions and not recording:
-                scores, keypoints, joint_scores = (last_predictions['scores'][0], last_predictions['keypoints'][0], last_predictions['joint_scores'][0])
-                for i in range(len(scores)):
-                    if scores[i][0] > 0.5 and check_arms_crossed_above_head(keypoints[i], joint_scores[i].flatten()):
-                        pose_found_this_frame = True
-                        break
+        if motion_detected_counter >= MOTION_TRIGGER_FRAMES and not recording:
+            recording = True
+            logger.info(f"✅ Movimento confirmado por {MOTION_TRIGGER_FRAMES} frames! Iniciando gravação...")
             
-            if pose_found_this_frame:
-                pose_detected_counter += 1
-                led.on()
-                time.sleep(0.1)
-                led.off()
-                time.sleep(0.1)
-
-            else:
-                pose_detected_counter = 0
-                
-            if pose_detected_counter >= POSE_TRIGGER_FRAMES and not recording:
-                recording = True
-                logger.info(f"✅ Pose confirmada por {POSE_TRIGGER_FRAMES} frames! Iniciando gravação...")
-                
-                # Verificar estado do buffer antes de gravar
-                buffer_current = circular_output.tell()
-                logger.info(f"Buffer atual: {buffer_current / (1024*1024):.1f} MB")
-                
-                # LED indica que vai gravar
-                led_recording_signal()
-                
-                base_filename = datetime.now().strftime("gravacao_%Y-%m-%d_%H-%M-%S")
-                h264_temp_filename = base_filename + "_buffer.h264"
-                h264_trimmed_filename = base_filename + "_trimmed.h264"
-                mp4_filename = base_filename + ".mp4"
-                
-                success = False
-                temp_files = []
-                step_failed = ""
-                
-                try:
-                    # PASSO 1: Salvar buffer circular
-                    logger.info("=== PASSO 1: Salvando buffer circular ===")
-                    if save_buffer_to_file(circular_output, h264_temp_filename):
-                        temp_files.append(h264_temp_filename)
-                        step_failed = "corte"
+            # Verificar estado do buffer antes de gravar
+            buffer_current = circular_output.tell()
+            logger.info(f"Buffer atual: {buffer_current / (1024*1024):.1f} MB")
+            
+            # LED indica que vai gravar
+            led_recording_signal()
+            
+            base_filename = datetime.now().strftime("gravacao_%Y-%m-%d_%H-%M-%S")
+            h264_temp_filename = base_filename + "_buffer.h264"
+            h264_trimmed_filename = base_filename + "_trimmed.h264"
+            mp4_filename = base_filename + ".mp4"
+            
+            success = False
+            temp_files = []
+            step_failed = ""
+            
+            try:
+                # PASSO 1: Salvar buffer circular
+                logger.info("=== PASSO 1: Salvando buffer circular ===")
+                if save_buffer_to_file(circular_output, h264_temp_filename):
+                    temp_files.append(h264_temp_filename)
+                    step_failed = "corte"
+                    
+                    # PASSO 2: Cortar para duração exata
+                    logger.info("=== PASSO 2: Cortando vídeo ===")
+                    if trim_video_to_duration(h264_temp_filename, h264_trimmed_filename, target_duration_seconds, fps):
+                        temp_files.append(h264_trimmed_filename)
+                        step_failed = "conversão"
                         
-                        # PASSO 2: Cortar para duração exata
-                        logger.info("=== PASSO 2: Cortando vídeo ===")
-                        if trim_video_to_duration(h264_temp_filename, h264_trimmed_filename, target_duration_seconds, fps):
-                            temp_files.append(h264_trimmed_filename)
-                            step_failed = "conversão"
-                            
-                            # PASSO 3: Converter para MP4
-                            logger.info("=== PASSO 3: Convertendo para MP4 ===")
-                            if convert_to_mp4(h264_trimmed_filename, mp4_filename, fps):
-                                success = True
-                                logger.info(f"✅ Gravação finalizada: {mp4_filename}")
-                            else:
-                                logger.error("Falha na conversão para MP4")
+                        # PASSO 3: Converter para MP4
+                        logger.info("=== PASSO 3: Convertendo para MP4 ===")
+                        if convert_to_mp4(h264_trimmed_filename, mp4_filename, fps):
+                            success = True
+                            logger.info(f"✅ Gravação finalizada: {mp4_filename}")
                         else:
-                            logger.error("Falha no corte do vídeo")
+                            logger.error("Falha na conversão para MP4")
                     else:
-                        step_failed = "salvamento do buffer"
-                        logger.error("Falha ao salvar buffer")
-                        
-                    if success:
-                        # LED indica gravação bem-sucedida
-                        led_success_signal()
-                        logger.info("✅ Gravação concluída com sucesso")
-                    else:
-                        # LED indica falha na gravação
-                        led_error_signal()
-                        logger.error(f"❌ Processo de gravação falhou na etapa: {step_failed}")
-                        
-                except Exception as e:
-                    logger.error(f"Erro inesperado durante processamento: {e}")
-                    logger.exception("Stack trace completo:")
+                        logger.error("Falha no corte do vídeo")
+                else:
+                    step_failed = "salvamento do buffer"
+                    logger.error("Falha ao salvar buffer")
+                    
+                if success:
+                    # LED indica gravação bem-sucedida
+                    led_success_signal()
+                    logger.info("✅ Gravação concluída com sucesso")
+                else:
+                    # LED indica falha na gravação
                     led_error_signal()
+                    logger.error(f"❌ Processo de gravação falhou na etapa: {step_failed}")
                     
-                finally:
-                    # Limpar arquivos temporários
-                    logger.info("=== Limpando arquivos temporários ===")
-                    for temp_file in temp_files:
-                        safe_remove_file(temp_file)
-                    
-                    logger.info("-> Sistema pronto para nova detecção.")
-                    pose_detected_counter = 0
-                    recording = False
+            except Exception as e:
+                logger.error(f"Erro inesperado durante processamento: {e}")
+                logger.exception("Stack trace completo:")
+                led_error_signal()
+                
+            finally:
+                # Limpar arquivos temporários
+                logger.info("=== Limpando arquivos temporários ===")
+                for temp_file in temp_files:
+                    safe_remove_file(temp_file)
+                
+                logger.info("-> Sistema pronto para nova detecção.")
+                motion_detected_counter = 0
+                recording = False
 
 except KeyboardInterrupt:
     logger.info("Programa interrompido pelo usuário")
