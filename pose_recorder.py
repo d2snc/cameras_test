@@ -107,8 +107,14 @@ try:
             
             if pose_found_this_frame:
                 pose_detected_counter += 1
+                led.on()
+                time.sleep(0.2)
+                led.off()
+                time.sleep(0.2)
             else:
                 pose_detected_counter = 0
+            
+
                 
             if pose_detected_counter >= POSE_TRIGGER_FRAMES and not recording:
                 recording = True
@@ -165,6 +171,7 @@ try:
                     
                 except subprocess.CalledProcessError as e:
                     print(f"❌ Erro ao processar vídeo: {e}")
+                    recording = False
                     led.on()
                     time.sleep(0.5)
                     led.off()
@@ -182,6 +189,7 @@ try:
                     led.off()
                 finally:
                     # Limpar arquivos temporários
+                    recording = False
                     for temp_file in [h264_temp_filename, h264_filename]:
                         if os.path.exists(temp_file):
                             os.remove(temp_file)
