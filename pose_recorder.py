@@ -71,10 +71,10 @@ try:
 
     
         # Calcular buffer
-        bitrate = 150000
+        bitrate = 2000000
         encoder = H264Encoder(bitrate=bitrate)
-        seconds_to_buffer = 60
-        buffer_size_bytes = int(bitrate / 8 * seconds_to_buffer)
+        #seconds_to_buffer = 60
+        buffer_size_bytes = 6000000
         circular_output = CircularOutput(buffersize=buffer_size_bytes)
 
         picam2.start_recording(encoder, circular_output)
