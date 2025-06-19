@@ -111,10 +111,7 @@ try:
                 
             if pose_detected_counter >= POSE_TRIGGER_FRAMES and not recording:
                 recording = True
-                print(f"✅ Pose confirmada por {POSE_TRIGGER_FRAMES} frames! Acionando LED e gravação...")
-                led.on()
-                time.sleep(3)
-                led.off()
+                
                 
                 base_filename = datetime.now().strftime("gravacao_%Y-%m-%d_%H-%M-%S")
                 h264_filename = base_filename + ".h264"
@@ -174,9 +171,16 @@ try:
                 
                 print("-> Sistema pronto para nova detecção.")
                 pose_detected_counter = 0
+                print(f"✅ Pose confirmada por {POSE_TRIGGER_FRAMES} frames! Acionando LED e gravação...")
+                led.on()
+                time.sleep(3)
+                led.off()
                 recording = False
 
 finally:
     if picam2.is_open:
         picam2.stop_recording()
     print("\nPrograma encerrado.")
+    led.on()
+    time.sleep(10)
+    led.off()
