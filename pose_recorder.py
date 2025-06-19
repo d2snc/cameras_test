@@ -19,6 +19,44 @@ logger = logging.getLogger(__name__)
 
 led = LED(17)
 
+def led_startup_signal():
+    """LED pisca 3 vezes por meio segundo - sistema iniciado"""
+    for _ in range(3):
+        led.on()
+        time.sleep(0.5)
+        led.off()
+        time.sleep(0.2)
+
+def led_recording_signal():
+    """LED pisca 1 vez por 1 segundo - vai gravar"""
+    led.on()
+    time.sleep(1)
+    led.off()
+
+def led_success_signal():
+    """LED pisca 2 vezes por meio segundo - gravação bem-sucedida"""
+    for _ in range(2):
+        led.on()
+        time.sleep(0.5)
+        led.off()
+        time.sleep(0.2)
+
+def led_error_signal():
+    """LED pisca 5 vezes por 0.3 segundos - gravação falhou"""
+    for _ in range(5):
+        led.on()
+        time.sleep(0.3)
+        led.off()
+        time.sleep(0.1)
+
+def led_critical_error_signal():
+    """LED pisca 10 vezes por 0.3 segundos - erro crítico"""
+    for _ in range(10):
+        led.on()
+        time.sleep(0.3)
+        led.off()
+        time.sleep(0.1)
+
 parser = argparse.ArgumentParser(description='Detecção de Pose com FFmpeg (Compatível com Pi 5)')
 parser.add_argument('-m', '--model', help="Caminho para o arquivo .hef", default="/usr/share/hailo-models/yolov8s_pose_h8l_pi.hef")
 args = parser.parse_args()
@@ -49,6 +87,7 @@ def check_ffmpeg_available():
     try:
         subprocess.run(['ffmpeg', '-version'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
         subprocess.run(['ffprobe', '-version'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
+        logger.info("FFmpeg e FFprobe disponíveis")
         return True
     except (subprocess.CalledProcessError, FileNotFoundError):
         logger.error("FFmpeg ou FFprobe não encontrado. Instale com: sudo apt install ffmpeg")
@@ -59,37 +98,33 @@ def get_video_duration(filepath):
     try:
         # Método 1: ffprobe
         command = [
-            'ffprobe', '-v', 'quiet', 
-            '-show_entries', 'format=duration', 
-            '-of', 'default=noprint_wrappers=1:nokey=1', 
+            'ffprobe', '-v', 'quiet',
+            '-show_entries', 'format=duration',
+            '-of', 'default=noprint_wrappers=1:nokey=1',
             filepath
         ]
         result = subprocess.run(command, capture_output=True, text=True, timeout=10)
-        
         if result.returncode == 0 and result.stdout.strip():
             duration = float(result.stdout.strip())
             logger.info(f"Duração detectada: {duration:.1f} segundos")
             return duration
-            
     except (subprocess.CalledProcessError, subprocess.TimeoutExpired, ValueError) as e:
         logger.warning(f"Método 1 falhou: {e}")
     
     try:
         # Método 2: ffprobe alternativo
         command = [
-            'ffprobe', '-v', 'quiet', 
-            '-select_streams', 'v:0', 
-            '-show_entries', 'stream=duration', 
-            '-of', 'csv=p=0', 
+            'ffprobe', '-v', 'quiet',
+            '-select_streams', 'v:0',
+            '-show_entries', 'stream=duration',
+            '-of', 'csv=p=0',
             filepath
         ]
         result = subprocess.run(command, capture_output=True, text=True, timeout=10)
-        
         if result.returncode == 0 and result.stdout.strip():
             duration = float(result.stdout.strip())
             logger.info(f"Duração detectada (método 2): {duration:.1f} segundos")
             return duration
-            
     except (subprocess.CalledProcessError, subprocess.TimeoutExpired, ValueError) as e:
         logger.warning(f"Método 2 falhou: {e}")
     
@@ -111,7 +146,6 @@ def save_buffer_to_file(circular_output, filepath):
         else:
             logger.error(f"Arquivo não foi criado ou está vazio: {filepath}")
             return False
-            
     except Exception as e:
         logger.error(f"Erro ao salvar buffer: {e}")
         return False
@@ -161,10 +195,10 @@ def trim_video_to_duration(input_file, output_file, target_duration, fps=30):
         try:
             logger.info(f"Tentativa {i}: {' '.join(command)}")
             result = subprocess.run(
-                command, 
-                stdout=subprocess.DEVNULL, 
-                stderr=subprocess.PIPE, 
-                text=True, 
+                command,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.PIPE,
+                text=True,
                 timeout=120,  # 2 minutos timeout
                 check=True
             )
@@ -215,10 +249,10 @@ def convert_to_mp4(input_file, output_file, fps=30):
         try:
             logger.info(f"Conversão - Tentativa {i}")
             result = subprocess.run(
-                command, 
-                stdout=subprocess.DEVNULL, 
-                stderr=subprocess.PIPE, 
-                text=True, 
+                command,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.PIPE,
+                text=True,
                 timeout=180,  # 3 minutos
                 check=True
             )
@@ -270,12 +304,17 @@ def draw_predictions(request):
             visualize_pose_estimation_result(last_predictions, m.array, model_size)
 
 # Verificar FFmpeg antes de iniciar
+logger.info("Verificando FFmpeg...")
 if not check_ffmpeg_available():
+    logger.error("FFmpeg não disponível - encerrando")
+    led_critical_error_signal()
     exit(1)
 
 picam2 = Picamera2()
 
 try:
+    logger.info("Inicializando sistema...")
+    
     with Hailo(args.model) as hailo:
         main_size = (1280, 720)
         model_h, model_w, _ = hailo.get_input_shape()
@@ -294,13 +333,11 @@ try:
         circular_output = CircularOutput(buffersize=buffer_size_bytes)
         picam2.start_recording(encoder, circular_output)
         
-        # pisca o led 3 vezes para indicar que o sistema está pronto
-        for _ in range(3):
-            led.on()
-            time.sleep(1)
-            led.off()
-            time.speep(1)
-        logger.info("🚀 Sistema iniciado. Aguardando detecção da pose...")
+        # LED indica sistema iniciado com sucesso
+        logger.info("✅ Sistema iniciado com sucesso")
+        led_startup_signal()
+        
+        logger.info("🚀 Sistema pronto. Aguardando detecção da pose...")
         
         while True:
             frame = picam2.capture_array('lores')
@@ -317,23 +354,15 @@ try:
             
             if pose_found_this_frame:
                 pose_detected_counter += 1
-                led.on()
-                time.sleep(0.2)
-                led.off()
             else:
                 pose_detected_counter = 0
                 
             if pose_detected_counter >= POSE_TRIGGER_FRAMES and not recording:
                 recording = True
-                logger.info(f"✅ Pose confirmada por {POSE_TRIGGER_FRAMES} frames! Acionando LED e gravação...")
-                led.on()
-                time.sleep(0.5)
-                led.off()
-                time.speep(0.5)
-                led.on()
-                time.sleep(0.5)
-                led.off()
-           
+                logger.info(f"✅ Pose confirmada por {POSE_TRIGGER_FRAMES} frames! Iniciando gravação...")
+                
+                # LED indica que vai gravar
+                led_recording_signal()
                 
                 base_filename = datetime.now().strftime("gravacao_%Y-%m-%d_%H-%M-%S")
                 h264_temp_filename = base_filename + "_buffer.h264"
@@ -366,11 +395,18 @@ try:
                     else:
                         logger.error("Falha ao salvar buffer")
                         
-                    if not success:
-                        logger.error("❌ Processo de gravação falhou completamente")
+                    if success:
+                        # LED indica gravação bem-sucedida
+                        led_success_signal()
+                        logger.info("✅ Gravação concluída com sucesso")
+                    else:
+                        # LED indica falha na gravação
+                        led_error_signal()
+                        logger.error("❌ Processo de gravação falhou")
                         
                 except Exception as e:
                     logger.error(f"Erro inesperado durante processamento: {e}")
+                    led_error_signal()
                     
                 finally:
                     # Limpar arquivos temporários
@@ -380,32 +416,17 @@ try:
                     logger.info("-> Sistema pronto para nova detecção.")
                     pose_detected_counter = 0
                     recording = False
-                    led.on()
-                    time.sleep(3)
-                    led.off()
 
+except KeyboardInterrupt:
+    logger.info("Programa interrompido pelo usuário")
 except Exception as e:
     logger.error(f"Erro crítico: {e}")
-    led.on()
-    time.sleep(0.3)
-    led.off()
-    time.speep(0.3)
-    led.on()
-    time.sleep(0.3)
-    led.off()
-    time.sleep(0.3)
-    led.off()
-    time.speep(0.3)
-    led.on()
-    time.sleep(0.3)
-    led.off()
-    time.sleep(0.3)
-    led.off()
-    time.speep(0.3)
-    led.on()
-    time.sleep(0.3)
-    led.off()
+    # LED indica erro crítico
+    led_critical_error_signal()
 finally:
-    if picam2.is_open:
-        picam2.stop_recording()
-    logger.info("Programa encerrado.")
+    try:
+        if picam2.is_open:
+            picam2.stop_recording()
+        logger.info("Programa encerrado.")
+    except:
+        pass
