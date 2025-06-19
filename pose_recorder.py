@@ -69,17 +69,12 @@ try:
         picam2.configure(config)
         #picam2.start_preview(Preview.QTGL, x=0, y=0, width=main_size[0] // 2, height=main_size[1] // 2)
 
-       
-        video_config = picam2.video_configuration()
-        fps = video_config.get('framerate', 30)
-
+    
         # Calcular buffer
+        bitrate = 1000000
+        encoder = H264Encoder(bitrate=bitrate)
         seconds_to_buffer = 60
-        total_frames = fps * seconds_to_buffer
-        estimated_bytes_per_frame = (main_size[0] * main_size[1] * 0.1)  # Ajustar multiplicador conforme necessário
-        buffer_size_bytes = int(total_frames * estimated_bytes_per_frame)
-        encoder = H264Encoder(bitrate=estimated_bytes_per_frame)
-        #buffer_size_bytes = int(bitrate / 8 * seconds_to_buffer)
+        buffer_size_bytes = int(bitrate / 8 * seconds_to_buffer)
         circular_output = CircularOutput(buffersize=buffer_size_bytes)
 
         picam2.start_recording(encoder, circular_output)
