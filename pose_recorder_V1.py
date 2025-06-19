@@ -69,10 +69,9 @@ try:
         picam2.configure(config)
         #picam2.start_preview(Preview.QTGL, x=0, y=0, width=main_size[0] // 2, height=main_size[1] // 2)
 
-        current_video_config = picam2.video_configuration()
-        bitrate = current_video_config.get('bitrate')
+        bitrate = 10000000
         encoder = H264Encoder(bitrate=bitrate)
-        seconds_to_buffer = 60
+        seconds_to_buffer = 20
         buffer_size_bytes = int(bitrate / 8 * seconds_to_buffer)
         circular_output = CircularOutput(buffersize=buffer_size_bytes)
 
