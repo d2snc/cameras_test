@@ -13,8 +13,15 @@ from picamera2.encoders import H264Encoder
 from picamera2.outputs import CircularOutput
 from picamera2.devices import Hailo
 
-# Configurar logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+# Configurar logging mais detalhado
+logging.basicConfig(
+    level=logging.DEBUG, 
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(),
+        logging.FileHandler('pose_detection.log')
+    ]
+)
 logger = logging.getLogger(__name__)
 
 led = LED(17)
@@ -75,9 +82,12 @@ def safe_remove_file(filepath):
     """Remove arquivo de forma segura"""
     try:
         if os.path.exists(filepath):
+            file_size = os.path.getsize(filepath)
             os.remove(filepath)
-            logger.info(f"Arquivo removido: {filepath}")
+            logger.info(f"Arquivo removido: {filepath} (era {file_size} bytes)")
             return True
+        else:
+            logger.warning(f"Tentativa de remover arquivo inexistente: {filepath}")
     except Exception as e:
         logger.error(f"Erro ao remover arquivo {filepath}: {e}")
     return False
@@ -85,16 +95,40 @@ def safe_remove_file(filepath):
 def check_ffmpeg_available():
     """Verifica se FFmpeg está disponível"""
     try:
-        subprocess.run(['ffmpeg', '-version'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
-        subprocess.run(['ffprobe', '-version'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
-        logger.info("FFmpeg e FFprobe disponíveis")
-        return True
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        logger.error("FFmpeg ou FFprobe não encontrado. Instale com: sudo apt install ffmpeg")
+        result = subprocess.run(['ffmpeg', '-version'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        logger.debug(f"FFmpeg version check: return code {result.returncode}")
+        
+        result2 = subprocess.run(['ffprobe', '-version'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        logger.debug(f"FFprobe version check: return code {result2.returncode}")
+        
+        if result.returncode == 0 and result2.returncode == 0:
+            logger.info("FFmpeg e FFprobe disponíveis")
+            return True
+        else:
+            logger.error("FFmpeg ou FFprobe retornaram erro")
+            return False
+    except FileNotFoundError as e:
+        logger.error(f"FFmpeg ou FFprobe não encontrado: {e}")
+        return False
+    except Exception as e:
+        logger.error(f"Erro ao verificar FFmpeg: {e}")
         return False
 
 def get_video_duration(filepath):
     """Obtém duração do vídeo de forma robusta"""
+    logger.debug(f"Tentando obter duração de: {filepath}")
+    
+    if not os.path.exists(filepath):
+        logger.error(f"Arquivo não existe: {filepath}")
+        return None
+    
+    file_size = os.path.getsize(filepath)
+    logger.debug(f"Tamanho do arquivo: {file_size} bytes")
+    
+    if file_size == 0:
+        logger.error(f"Arquivo está vazio: {filepath}")
+        return None
+    
     try:
         # Método 1: ffprobe
         command = [
@@ -103,29 +137,35 @@ def get_video_duration(filepath):
             '-of', 'default=noprint_wrappers=1:nokey=1',
             filepath
         ]
-        result = subprocess.run(command, capture_output=True, text=True, timeout=10)
+        logger.debug(f"Executando comando: {' '.join(command)}")
+        result = subprocess.run(command, capture_output=True, text=True, timeout=15)
+        logger.debug(f"Return code: {result.returncode}, stdout: '{result.stdout}', stderr: '{result.stderr}'")
+        
         if result.returncode == 0 and result.stdout.strip():
             duration = float(result.stdout.strip())
             logger.info(f"Duração detectada: {duration:.1f} segundos")
             return duration
-    except (subprocess.CalledProcessError, subprocess.TimeoutExpired, ValueError) as e:
+    except Exception as e:
         logger.warning(f"Método 1 falhou: {e}")
     
     try:
         # Método 2: ffprobe alternativo
         command = [
-            'ffprobe', '-v', 'quiet',
+            'ffprobe', '-v', 'error',
             '-select_streams', 'v:0',
             '-show_entries', 'stream=duration',
             '-of', 'csv=p=0',
             filepath
         ]
-        result = subprocess.run(command, capture_output=True, text=True, timeout=10)
+        logger.debug(f"Executando comando alternativo: {' '.join(command)}")
+        result = subprocess.run(command, capture_output=True, text=True, timeout=15)
+        logger.debug(f"Return code: {result.returncode}, stdout: '{result.stdout}', stderr: '{result.stderr}'")
+        
         if result.returncode == 0 and result.stdout.strip():
             duration = float(result.stdout.strip())
             logger.info(f"Duração detectada (método 2): {duration:.1f} segundos")
             return duration
-    except (subprocess.CalledProcessError, subprocess.TimeoutExpired, ValueError) as e:
+    except Exception as e:
         logger.warning(f"Método 2 falhou: {e}")
     
     logger.error("Não foi possível determinar a duração do vídeo")
@@ -133,92 +173,114 @@ def get_video_duration(filepath):
 
 def save_buffer_to_file(circular_output, filepath):
     """Salva buffer circular para arquivo de forma robusta"""
+    logger.debug(f"Iniciando salvamento do buffer para: {filepath}")
+    
     try:
+        # Verificar estado do circular_output
+        buffer_size = circular_output.tell()
+        logger.debug(f"Tamanho atual do buffer: {buffer_size} bytes")
+        
+        if buffer_size == 0:
+            logger.error("Buffer circular está vazio!")
+            return False
+        
         with open(filepath, "wb") as f:
+            logger.debug("Arquivo aberto para escrita")
             circular_output.fileoutput = f
+            logger.debug("fileoutput configurado")
             circular_output.copy_to_file()
+            logger.debug("copy_to_file executado")
         
         # Verificar se arquivo foi criado e tem tamanho > 0
-        if os.path.exists(filepath) and os.path.getsize(filepath) > 0:
-            size_mb = os.path.getsize(filepath) / (1024 * 1024)
-            logger.info(f"Buffer salvo: {filepath} ({size_mb:.1f} MB)")
-            return True
+        if os.path.exists(filepath):
+            file_size = os.path.getsize(filepath)
+            if file_size > 0:
+                size_mb = file_size / (1024 * 1024)
+                logger.info(f"Buffer salvo com sucesso: {filepath} ({size_mb:.1f} MB)")
+                return True
+            else:
+                logger.error(f"Arquivo foi criado mas está vazio: {filepath}")
+                return False
         else:
-            logger.error(f"Arquivo não foi criado ou está vazio: {filepath}")
+            logger.error(f"Arquivo não foi criado: {filepath}")
             return False
+            
     except Exception as e:
         logger.error(f"Erro ao salvar buffer: {e}")
+        logger.exception("Stack trace completo:")
         return False
 
 def trim_video_to_duration(input_file, output_file, target_duration, fps=30):
-    """Corta vídeo para duração específica com múltiplas tentativas"""
+    """Corta vídeo para duração específica com diagnóstico detalhado"""
+    
+    logger.debug(f"Iniciando corte: {input_file} -> {output_file}, duração: {target_duration}s")
     
     # Verificar se arquivo de entrada existe
     if not os.path.exists(input_file):
         logger.error(f"Arquivo de entrada não encontrado: {input_file}")
         return False
     
+    input_size = os.path.getsize(input_file)
+    logger.debug(f"Tamanho do arquivo de entrada: {input_size} bytes")
+    
     duration = get_video_duration(input_file)
     
     if duration is None:
         logger.warning("Usando corte simples sem detecção de duração")
         commands_to_try = [
-            # Método 1: Corte simples
             ['ffmpeg', '-y', '-i', input_file, '-t', str(target_duration), '-c:v', 'copy', output_file],
-            # Método 2: Com framerate
-            ['ffmpeg', '-y', '-framerate', str(fps), '-i', input_file, '-t', str(target_duration), '-c:v', 'copy', output_file],
-            # Método 3: Recodificação se cópia falhar
-            ['ffmpeg', '-y', '-i', input_file, '-t', str(target_duration), '-c:v', 'libx264', '-preset', 'fast', output_file]
+            ['ffmpeg', '-y', '-i', input_file, '-t', str(target_duration), '-c:v', 'libx264', '-preset', 'ultrafast', output_file]
         ]
     else:
         if duration > target_duration:
-            # Pegar os últimos N segundos
             start_time = duration - target_duration
             logger.info(f"Cortando últimos {target_duration} segundos (início em {start_time:.1f}s)")
             commands_to_try = [
-                # Método 1: Corte dos últimos segundos
                 ['ffmpeg', '-y', '-ss', str(start_time), '-i', input_file, '-t', str(target_duration), '-c:v', 'copy', output_file],
-                # Método 2: Sem copy (recodificação)
-                ['ffmpeg', '-y', '-ss', str(start_time), '-i', input_file, '-t', str(target_duration), '-c:v', 'libx264', '-preset', 'fast', output_file]
+                ['ffmpeg', '-y', '-ss', str(start_time), '-i', input_file, '-t', str(target_duration), '-c:v', 'libx264', '-preset', 'ultrafast', output_file]
             ]
         else:
             logger.info(f"Vídeo tem {duration:.1f}s, menor que {target_duration}s - usando tudo")
             commands_to_try = [
-                # Método 1: Cópia direta
                 ['ffmpeg', '-y', '-i', input_file, '-c:v', 'copy', output_file],
-                # Método 2: Com recodificação
-                ['ffmpeg', '-y', '-i', input_file, '-c:v', 'libx264', '-preset', 'fast', output_file]
+                ['ffmpeg', '-y', '-i', input_file, '-c:v', 'libx264', '-preset', 'ultrafast', output_file]
             ]
     
     # Tentar cada comando
     for i, command in enumerate(commands_to_try, 1):
         try:
             logger.info(f"Tentativa {i}: {' '.join(command)}")
+            
             result = subprocess.run(
                 command,
-                stdout=subprocess.DEVNULL,
+                stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
-                timeout=120,  # 2 minutos timeout
-                check=True
+                timeout=180,  # 3 minutos timeout
+                check=False  # Não levantar exceção automaticamente
             )
             
-            # Verificar se arquivo foi criado com sucesso
-            if os.path.exists(output_file) and os.path.getsize(output_file) > 0:
-                size_mb = os.path.getsize(output_file) / (1024 * 1024)
-                logger.info(f"✅ Vídeo cortado com sucesso: {output_file} ({size_mb:.1f} MB)")
-                return True
+            logger.debug(f"Return code: {result.returncode}")
+            logger.debug(f"Stdout: {result.stdout}")
+            logger.debug(f"Stderr: {result.stderr}")
+            
+            if result.returncode == 0:
+                # Verificar se arquivo foi criado com sucesso
+                if os.path.exists(output_file):
+                    output_size = os.path.getsize(output_file)
+                    if output_size > 0:
+                        size_mb = output_size / (1024 * 1024)
+                        logger.info(f"✅ Vídeo cortado com sucesso: {output_file} ({size_mb:.1f} MB)")
+                        return True
+                    else:
+                        logger.warning(f"Arquivo criado mas vazio: {output_file}")
+                else:
+                    logger.warning(f"Comando executou mas arquivo não foi criado: {output_file}")
             else:
-                logger.warning(f"Comando executou mas arquivo não foi criado: tentativa {i}")
-                continue
+                logger.error(f"FFmpeg retornou código {result.returncode}")
                 
         except subprocess.TimeoutExpired:
             logger.error(f"Timeout na tentativa {i}")
-            continue
-        except subprocess.CalledProcessError as e:
-            logger.error(f"Tentativa {i} falhou: {e}")
-            if e.stderr:
-                logger.error(f"Stderr: {e.stderr}")
             continue
         except Exception as e:
             logger.error(f"Erro inesperado na tentativa {i}: {e}")
@@ -228,42 +290,56 @@ def trim_video_to_duration(input_file, output_file, target_duration, fps=30):
     return False
 
 def convert_to_mp4(input_file, output_file, fps=30):
-    """Converte H264 para MP4 com múltiplas tentativas"""
+    """Converte H264 para MP4 com diagnóstico detalhado"""
+    
+    logger.debug(f"Iniciando conversão: {input_file} -> {output_file}")
     
     if not os.path.exists(input_file):
         logger.error(f"Arquivo de entrada não encontrado: {input_file}")
         return False
     
+    input_size = os.path.getsize(input_file)
+    logger.debug(f"Tamanho do arquivo de entrada: {input_size} bytes")
+    
     commands_to_try = [
-        # Método 1: Cópia simples
         ['ffmpeg', '-y', '-framerate', str(fps), '-i', input_file, '-c:v', 'copy', output_file],
-        # Método 2: Sem framerate especificado
         ['ffmpeg', '-y', '-i', input_file, '-c:v', 'copy', output_file],
-        # Método 3: Com recodificação
-        ['ffmpeg', '-y', '-i', input_file, '-c:v', 'libx264', '-preset', 'fast', output_file],
-        # Método 4: Formato mais compatível
-        ['ffmpeg', '-y', '-i', input_file, '-c:v', 'libx264', '-preset', 'fast', '-pix_fmt', 'yuv420p', output_file]
+        ['ffmpeg', '-y', '-i', input_file, '-c:v', 'libx264', '-preset', 'ultrafast', output_file]
     ]
     
     for i, command in enumerate(commands_to_try, 1):
         try:
-            logger.info(f"Conversão - Tentativa {i}")
+            logger.info(f"Conversão - Tentativa {i}: {' '.join(command)}")
+            
             result = subprocess.run(
                 command,
-                stdout=subprocess.DEVNULL,
+                stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
-                timeout=180,  # 3 minutos
-                check=True
+                timeout=240,  # 4 minutos
+                check=False
             )
             
-            if os.path.exists(output_file) and os.path.getsize(output_file) > 0:
-                size_mb = os.path.getsize(output_file) / (1024 * 1024)
-                logger.info(f"✅ Conversão bem-sucedida: {output_file} ({size_mb:.1f} MB)")
-                return True
+            logger.debug(f"Return code: {result.returncode}")
+            logger.debug(f"Stdout: {result.stdout}")
+            logger.debug(f"Stderr: {result.stderr}")
+            
+            if result.returncode == 0:
+                if os.path.exists(output_file):
+                    output_size = os.path.getsize(output_file)
+                    if output_size > 0:
+                        size_mb = output_size / (1024 * 1024)
+                        logger.info(f"✅ Conversão bem-sucedida: {output_file} ({size_mb:.1f} MB)")
+                        return True
+                    else:
+                        logger.warning(f"Arquivo MP4 criado mas vazio: {output_file}")
+                else:
+                    logger.warning(f"Comando executou mas arquivo MP4 não foi criado")
+            else:
+                logger.error(f"FFmpeg conversão retornou código {result.returncode}")
                 
-        except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
-            logger.error(f"Tentativa {i} de conversão falhou: {e}")
+        except subprocess.TimeoutExpired:
+            logger.error(f"Timeout na conversão tentativa {i}")
             continue
         except Exception as e:
             logger.error(f"Erro inesperado na conversão tentativa {i}: {e}")
@@ -333,6 +409,8 @@ try:
         circular_output = CircularOutput(buffersize=buffer_size_bytes)
         picam2.start_recording(encoder, circular_output)
         
+        logger.info(f"Gravação iniciada - Buffer: {buffer_size_bytes / (1024*1024):.0f} MB, Bitrate: {bitrate}")
+        
         # LED indica sistema iniciado com sucesso
         logger.info("✅ Sistema iniciado com sucesso")
         led_startup_signal()
@@ -361,6 +439,10 @@ try:
                 recording = True
                 logger.info(f"✅ Pose confirmada por {POSE_TRIGGER_FRAMES} frames! Iniciando gravação...")
                 
+                # Verificar estado do buffer antes de gravar
+                buffer_current = circular_output.tell()
+                logger.info(f"Buffer atual: {buffer_current / (1024*1024):.1f} MB")
+                
                 # LED indica que vai gravar
                 led_recording_signal()
                 
@@ -371,20 +453,23 @@ try:
                 
                 success = False
                 temp_files = []
+                step_failed = ""
                 
                 try:
                     # PASSO 1: Salvar buffer circular
-                    logger.info("Salvando buffer circular...")
+                    logger.info("=== PASSO 1: Salvando buffer circular ===")
                     if save_buffer_to_file(circular_output, h264_temp_filename):
                         temp_files.append(h264_temp_filename)
+                        step_failed = "corte"
                         
                         # PASSO 2: Cortar para duração exata
-                        logger.info(f"Cortando para {target_duration_seconds} segundos...")
+                        logger.info("=== PASSO 2: Cortando vídeo ===")
                         if trim_video_to_duration(h264_temp_filename, h264_trimmed_filename, target_duration_seconds, fps):
                             temp_files.append(h264_trimmed_filename)
+                            step_failed = "conversão"
                             
                             # PASSO 3: Converter para MP4
-                            logger.info("Convertendo para MP4...")
+                            logger.info("=== PASSO 3: Convertendo para MP4 ===")
                             if convert_to_mp4(h264_trimmed_filename, mp4_filename, fps):
                                 success = True
                                 logger.info(f"✅ Gravação finalizada: {mp4_filename}")
@@ -393,6 +478,7 @@ try:
                         else:
                             logger.error("Falha no corte do vídeo")
                     else:
+                        step_failed = "salvamento do buffer"
                         logger.error("Falha ao salvar buffer")
                         
                     if success:
@@ -402,14 +488,16 @@ try:
                     else:
                         # LED indica falha na gravação
                         led_error_signal()
-                        logger.error("❌ Processo de gravação falhou")
+                        logger.error(f"❌ Processo de gravação falhou na etapa: {step_failed}")
                         
                 except Exception as e:
                     logger.error(f"Erro inesperado durante processamento: {e}")
+                    logger.exception("Stack trace completo:")
                     led_error_signal()
                     
                 finally:
                     # Limpar arquivos temporários
+                    logger.info("=== Limpando arquivos temporários ===")
                     for temp_file in temp_files:
                         safe_remove_file(temp_file)
                     
@@ -421,6 +509,7 @@ except KeyboardInterrupt:
     logger.info("Programa interrompido pelo usuário")
 except Exception as e:
     logger.error(f"Erro crítico: {e}")
+    logger.exception("Stack trace completo:")
     # LED indica erro crítico
     led_critical_error_signal()
 finally:
