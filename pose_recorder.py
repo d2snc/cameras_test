@@ -88,6 +88,7 @@ try:
             led.on()
             time.sleep(1)
             led.off()
+            time.sleep(1)
             
         print("🚀 Sistema iniciado. Aguardando detecção da pose...")
         
@@ -111,7 +112,9 @@ try:
                 
             if pose_detected_counter >= POSE_TRIGGER_FRAMES and not recording:
                 recording = True
-                
+                led.on()
+                time.sleep(3)
+                led.off()
                 
                 base_filename = datetime.now().strftime("gravacao_%Y-%m-%d_%H-%M-%S")
                 h264_filename = base_filename + ".h264"
@@ -163,19 +166,19 @@ try:
                 except subprocess.CalledProcessError as e:
                     print(f"❌ Erro ao processar vídeo: {e}")
                     led.on()
-                    time.sleep(1)
+                    time.sleep(0.5)
                     led.off()
-                    time.sleep(1)
+                    time.sleep(0.5)
                     led.on()
-                    time.sleep(1)
+                    time.sleep(0.5)
                     led.off()
-                    time.sleep(1)
+                    time.sleep(0.5)
                     led.on()
-                    time.sleep(1)
+                    time.sleep(0.5)
                     led.off()
-                    time.sleep(1)
+                    time.sleep(0.5)
                     led.on()
-                    time.sleep(1)
+                    time.sleep(0.5)
                     led.off()
                 finally:
                     # Limpar arquivos temporários
@@ -187,11 +190,15 @@ try:
                 print("-> Sistema pronto para nova detecção.")
                 pose_detected_counter = 0
                 print(f"✅ Pose confirmada por {POSE_TRIGGER_FRAMES} frames! Acionando LED e gravação...")
-                led.on()
-                time.sleep(3)
-                led.off()
+                
                 recording = False
-
+                led.on()
+                time.sleep(1)
+                led.off()
+                time.sleep(1)
+                led.on()
+                time.sleep(1)
+                led.off()
 finally:
     if picam2.is_open:
         picam2.stop_recording()
