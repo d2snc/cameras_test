@@ -432,6 +432,11 @@ try:
             
             if pose_found_this_frame:
                 pose_detected_counter += 1
+                led.on()
+                time.sleep(0.1)
+                led.off()
+                time.sleep(0.1)
+
             else:
                 pose_detected_counter = 0
                 
