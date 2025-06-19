@@ -162,6 +162,21 @@ try:
                     
                 except subprocess.CalledProcessError as e:
                     print(f"❌ Erro ao processar vídeo: {e}")
+                    led.on()
+                    time.sleep(1)
+                    led.off()
+                    time.sleep(1)
+                    led.on()
+                    time.sleep(1)
+                    led.off()
+                    time.sleep(1)
+                    led.on()
+                    time.sleep(1)
+                    led.off()
+                    time.sleep(1)
+                    led.on()
+                    time.sleep(1)
+                    led.off()
                 finally:
                     # Limpar arquivos temporários
                     for temp_file in [h264_temp_filename, h264_filename]:
@@ -181,14 +196,9 @@ finally:
     if picam2.is_open:
         picam2.stop_recording()
     print("\nPrograma encerrado.")
-    led.on()
-    time.sleep(1)
-    led.off()
-    time.sleep(1)
-    led.off()
-    time.sleep(1)
-    led.off()
-    time.sleep(1)
-    led.off()
-    time.sleep(1)
-    led.off()
+    while true:
+        led.on()
+        time.sleep(1)
+        led.off()
+        time.sleep(1)
+
