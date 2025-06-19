@@ -71,7 +71,7 @@ try:
 
     
         # Calcular buffer
-        bitrate = 1000000
+        bitrate = 750000
         encoder = H264Encoder(bitrate=bitrate)
         seconds_to_buffer = 60
         buffer_size_bytes = int(bitrate / 8 * seconds_to_buffer)
