@@ -22,9 +22,20 @@ def blink_led(times, duration):
         led.off()
         time.sleep(duration)
 
-def crash_handler():
-    """Pisca o LED 10 vezes quando o programa crashar"""
-    blink_led(10, 0.5)
+def continuous_error_blink():
+    """Pisca o LED continuamente a cada 0.5 segundos quando há erro crítico"""
+    print("❌ Erro crítico detectado! LED piscando continuamente...")
+    try:
+        while True:
+            led.on()
+            time.sleep(0.5)
+            led.off()
+            time.sleep(0.5)
+    except KeyboardInterrupt:
+        led.off()
+        print("\nPrograma interrompido pelo usuário.")
+    except:
+        led.off()
 
 parser = argparse.ArgumentParser(description='Detecção de Pose com FFmpeg (Compatível com Pi 5)')
 parser.add_argument('-m', '--model', help="Caminho para o arquivo .hef", default="/usr/share/hailo-models/yolov8s_pose_h8l_pi.hef")
@@ -97,102 +108,130 @@ def trim_video_to_last_60_seconds(video_path):
     except Exception as e:
         print(f"❌ Erro ao cortar vídeo: {e}")
 
-picam2 = Picamera2()
-
-try:
-    with Hailo(args.model) as hailo:
-        main_size = (1280, 720)
-        model_h, model_w, _ = hailo.get_input_shape()
-        model_size = lores_size = (model_w, model_h)
-        config = picam2.create_video_configuration(main={'size': main_size, 'format': 'XRGB8888'}, lores={'size': lores_size, 'format': 'RGB888'}, controls={'FrameRate': 30})
-        picam2.configure(config)
-        #picam2.start_preview(Preview.QTGL, x=0, y=0, width=main_size[0] // 2, height=main_size[1] // 2)
-        bitrate = 10000000
-        encoder = H264Encoder(bitrate=bitrate)
-        seconds_to_buffer = 20
-        buffer_size_bytes = int(bitrate / 8 * seconds_to_buffer)
-        circular_output = CircularOutput(buffersize=buffer_size_bytes)
-        picam2.start_recording(encoder, circular_output)
-        #Descomentar abaixo se quiser visualizar as predições na tela
-        #picam2.pre_callback = draw_predictions
-        
-        # Pisca o LED 3 vezes por 0.5 segundos para indicar que o sistema está pronto
-        blink_led(3, 0.5)
-        print("🚀 Sistema iniciado. Aguardando detecção da pose...")
-        
-        while True:
-            frame = picam2.capture_array('lores')
-            raw_detections = hailo.run(frame)
-            last_predictions = postproc_yolov8_pose(1, raw_detections, model_size)
-            pose_found_this_frame = False
-            
-            if last_predictions and not recording:
-                scores, keypoints, joint_scores = (last_predictions['scores'][0], last_predictions['keypoints'][0], last_predictions['joint_scores'][0])
-                for i in range(len(scores)):
-                    if scores[i][0] > 0.5 and check_arms_crossed_above_head(keypoints[i], joint_scores[i].flatten()):
-                        pose_found_this_frame = True
-                        break
-            
-            if pose_found_this_frame:
-                pose_detected_counter += 1
-            else:
-                pose_detected_counter = 0
-            
-            if pose_detected_counter >= POSE_TRIGGER_FRAMES and not recording:
-                recording = True
-                print(f"✅ Pose confirmada por {POSE_TRIGGER_FRAMES} frames! Acionando LED e gravação...")
-                
-                # Acende o LED por 1 segundo quando começar a gravar
-                led.on()
-                time.sleep(1)
-                led.off()
-                
-                base_filename = datetime.now().strftime("gravacao_%Y-%m-%d_%H-%M-%S")
-                h264_filename = base_filename + ".h264"
-                mp4_filename = base_filename + ".mp4"
-                circular_output.fileoutput = h264_filename
-                circular_output.start()
-                circular_output.stop()
-                print(f"-> Arquivo temporário '{h264_filename}' salvo.")
-                print(f"-> Convertendo para '{mp4_filename}' com FFmpeg...")
-                
-                conversion_success = False
-                try:
-                    # Conversão para MP4
-                    command = f"ffmpeg -framerate 30 -i {h264_filename} -c:v copy {mp4_filename}"
-                    subprocess.run(command, shell=True, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                    print(f"✅ Gravação convertida para '{mp4_filename}'.")
-                    
-                    # Corta o vídeo para os últimos 60 segundos
-                    trim_video_to_last_60_seconds(mp4_filename)
-                    
-                    print(f"✅ Gravação final salva como '{mp4_filename}'.")
-                    conversion_success = True
-                    
-                    # Pisca 2 vezes por 0.5 segundos quando a gravação for concluída com sucesso
-                    blink_led(2, 0.5)
-                    
-                except subprocess.CalledProcessError as e:
-                    print(f"❌ Erro ao converter com FFmpeg: {e}")
-                    # Pisca 6 vezes por 0.3 segundos quando a gravação falhar
-                    blink_led(6, 0.3)
-                finally:
-                    if os.path.exists(h264_filename):
-                        os.remove(h264_filename)
-                        print(f"-> Arquivo temporário '{h264_filename}' removido.")
-                
-                print("-> Sistema pronto para nova detecção.")
-                pose_detected_counter = 0
-                recording = False
-
-except Exception as e:
-    print(f"❌ Erro crítico: {e}")
-    crash_handler()
-    raise
-finally:
+def main_program():
+    """Função principal do programa"""
+    global pose_detected_counter, last_predictions, recording, model_size
+    
+    picam2 = Picamera2()
+    
     try:
+        with Hailo(args.model) as hailo:
+            main_size = (1280, 720)
+            model_h, model_w, _ = hailo.get_input_shape()
+            model_size = lores_size = (model_w, model_h)
+            config = picam2.create_video_configuration(main={'size': main_size, 'format': 'XRGB8888'}, lores={'size': lores_size, 'format': 'RGB888'}, controls={'FrameRate': 30})
+            picam2.configure(config)
+            #picam2.start_preview(Preview.QTGL, x=0, y=0, width=main_size[0] // 2, height=main_size[1] // 2)
+            bitrate = 10000000
+            encoder = H264Encoder(bitrate=bitrate)
+            seconds_to_buffer = 20
+            buffer_size_bytes = int(bitrate / 8 * seconds_to_buffer)
+            circular_output = CircularOutput(buffersize=buffer_size_bytes)
+            picam2.start_recording(encoder, circular_output)
+            #Descomentar abaixo se quiser visualizar as predições na tela
+            #picam2.pre_callback = draw_predictions
+            
+            # Pisca o LED 3 vezes por 0.5 segundos para indicar que o sistema está pronto
+            blink_led(3, 0.5)
+            print("🚀 Sistema iniciado. Aguardando detecção da pose...")
+            
+            while True:
+                frame = picam2.capture_array('lores')
+                raw_detections = hailo.run(frame)
+                last_predictions = postproc_yolov8_pose(1, raw_detections, model_size)
+                pose_found_this_frame = False
+                
+                if last_predictions and not recording:
+                    scores, keypoints, joint_scores = (last_predictions['scores'][0], last_predictions['keypoints'][0], last_predictions['joint_scores'][0])
+                    for i in range(len(scores)):
+                        if scores[i][0] > 0.5 and check_arms_crossed_above_head(keypoints[i], joint_scores[i].flatten()):
+                            pose_found_this_frame = True
+                            break
+                
+                if pose_found_this_frame:
+                    pose_detected_counter += 1
+                else:
+                    pose_detected_counter = 0
+                
+                if pose_detected_counter >= POSE_TRIGGER_FRAMES and not recording:
+                    recording = True
+                    print(f"✅ Pose confirmada por {POSE_TRIGGER_FRAMES} frames! Acionando LED e gravação...")
+                    
+                    # Acende o LED por 1 segundo quando começar a gravar
+                    led.on()
+                    time.sleep(1)
+                    led.off()
+                    
+                    base_filename = datetime.now().strftime("gravacao_%Y-%m-%d_%H-%M-%S")
+                    h264_filename = base_filename + ".h264"
+                    mp4_filename = base_filename + ".mp4"
+                    circular_output.fileoutput = h264_filename
+                    circular_output.start()
+                    circular_output.stop()
+                    print(f"-> Arquivo temporário '{h264_filename}' salvo.")
+                    print(f"-> Convertendo para '{mp4_filename}' com FFmpeg...")
+                    
+                    conversion_success = False
+                    try:
+                        # Conversão para MP4
+                        command = f"ffmpeg -framerate 30 -i {h264_filename} -c:v copy {mp4_filename}"
+                        subprocess.run(command, shell=True, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                        print(f"✅ Gravação convertida para '{mp4_filename}'.")
+                        
+                        # Corta o vídeo para os últimos 60 segundos
+                        trim_video_to_last_60_seconds(mp4_filename)
+                        
+                        print(f"✅ Gravação final salva como '{mp4_filename}'.")
+                        conversion_success = True
+                        
+                        # Pisca 2 vezes por 0.5 segundos quando a gravação for concluída com sucesso
+                        blink_led(2, 0.5)
+                        
+                    except subprocess.CalledProcessError as e:
+                        print(f"❌ Erro ao converter com FFmpeg: {e}")
+                        # Pisca 6 vezes por 0.3 segundos quando a gravação falhar
+                        blink_led(6, 0.3)
+                    finally:
+                        if os.path.exists(h264_filename):
+                            os.remove(h264_filename)
+                            print(f"-> Arquivo temporário '{h264_filename}' removido.")
+                    
+                    print("-> Sistema pronto para nova detecção.")
+                    pose_detected_counter = 0
+                    recording = False
+    
+    except KeyboardInterrupt:
+        print("\nPrograma interrompido pelo usuário.")
         if picam2.is_open:
             picam2.stop_recording()
-    except:
-        pass
-    print("\nPrograma encerrado.")
+        led.off()
+        return  # Sai normalmente sem erro
+        
+    except Exception as e:
+        print(f"❌ Erro no programa principal: {e}")
+        try:
+            if picam2.is_open:
+                picam2.stop_recording()
+        except:
+            pass
+        raise  # Re-levanta a exceção para ser capturada pelo handler principal
+    
+    finally:
+        try:
+            if picam2.is_open:
+                picam2.stop_recording()
+        except:
+            pass
+
+# Execução principal com handler de erro
+if __name__ == "__main__":
+    try:
+        main_program()
+        print("\nPrograma encerrado normalmente.")
+    except KeyboardInterrupt:
+        print("\nPrograma interrompido pelo usuário.")
+        led.off()
+    except Exception as e:
+        print(f"❌ Erro crítico: {e}")
+        # Em vez de encerrar, pisca o LED continuamente
+        continuous_error_blink()
