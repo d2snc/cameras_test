@@ -40,7 +40,7 @@ def continuous_error_blink():
         led.off()
 
 parser = argparse.ArgumentParser(description='Detecção de Pose com FFmpeg (Compatível com Pi 5)')
-parser.add_argument('-m', '--model', help="Caminho para o arquivo .hef", default="/usr/share/hailo-models/yolov8s_pose_h8l_pi.hef")
+parser.add_argument('-m', '--model', help="Caminho para o arquivo .hef", default="/home/d2snc/Documents/cameras_test/yolov8m_pose.hef")
 args = parser.parse_args()
 
 NOSE, L_EYE, R_EYE, L_EAR, R_EAR, L_SHOULDER, R_SHOULDER, L_ELBOW, R_ELBOW, \
@@ -63,27 +63,81 @@ def check_arms_crossed_above_head(keypoints, joint_scores, threshold=0.6):
         left_wrist_x, left_wrist_y = keypoints[L_WRIST]
         right_wrist_x, right_wrist_y = keypoints[R_WRIST]
         nose_x, nose_y = keypoints[NOSE]
+        
+        # Check if both wrists are above the head (nose)
         arms_are_up = (left_wrist_y < nose_y) and (right_wrist_y < nose_y)
-        arms_are_crossed = (left_wrist_x > nose_x) and (right_wrist_x < nose_x)
-        return arms_are_up and arms_are_crossed
+        
+        # Calculate distance between wrists
+        wrist_distance = ((left_wrist_x - right_wrist_x) ** 2 + (left_wrist_y - right_wrist_y) ** 2) ** 0.5
+        
+        # Define close distance threshold (adjust based on your needs)
+        close_distance_threshold = 50  # pixels - you may need to adjust this
+        
+        # Check if wrists are close to each other
+        wrists_are_close = wrist_distance < close_distance_threshold
+        
+        return arms_are_up and wrists_are_close
     except:
         return False
 
-def visualize_pose_estimation_result(results, image, model_size, detection_threshold=0.5, joint_threshold=0.5):
+def visualize_pose_estimation_result(results, image, model_size, detection_threshold=0.3, joint_threshold=0.3):
+    global pose_detected_counter, recording
     try:
         image_size = (image.shape[1], image.shape[0])
         def scale_coord(coord): return tuple([int(c * t / f) for c, f, t in zip(coord, model_size, image_size)])
+        
+        # Add status indicators
+        status_color = (0, 255, 0) if recording else (255, 255, 255)
+        status_text = "RECORDING" if recording else f"POSE COUNT: {pose_detected_counter}/{POSE_TRIGGER_FRAMES}"
+        cv2.putText(image, status_text, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, status_color, 2)
+        
         if not results or 'bboxes' not in results: return
         bboxes, scores, keypoints, joint_scores = (results['bboxes'][0], results['scores'][0], results['keypoints'][0], results['joint_scores'][0])
+        
         for detection_box, detection_score, detection_keypoints, detection_keypoints_score in zip(bboxes, scores, keypoints, joint_scores):
             if detection_score[0] < detection_threshold: continue
+            
+            # Check if this detection has the target pose
+            has_target_pose = False
+            try:
+                if check_arms_crossed_above_head(detection_keypoints, detection_keypoints_score.flatten()):
+                    has_target_pose = True
+            except:
+                pass
+            
+            # Use different colors for target pose vs regular detection
+            bbox_color = (0, 255, 255) if has_target_pose else (0, 255, 0)  # Yellow for target pose, green for regular
+            joint_color = (255, 255, 0) if has_target_pose else (255, 0, 255)  # Cyan for target pose, magenta for regular
+            
             coord_min, coord_max = scale_coord(detection_box[:2]), scale_coord(detection_box[2:])
-            cv2.rectangle(image, coord_min, coord_max, (0, 255, 0), 2)
+            cv2.rectangle(image, coord_min, coord_max, bbox_color, 3 if has_target_pose else 2)
+            
+            # Add confidence score
+            conf_text = f"{detection_score[0]:.2f}"
+            cv2.putText(image, conf_text, (coord_min[0], coord_min[1] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, bbox_color, 1)
+            
             joint_visible = detection_keypoints_score.flatten() > joint_threshold
+            
+            # Draw skeleton
             for joint0_idx, joint1_idx in JOINT_PAIRS:
                 if joint_visible[joint0_idx] and joint_visible[joint1_idx]:
                     p1, p2 = scale_coord(detection_keypoints[joint0_idx]), scale_coord(detection_keypoints[joint1_idx])
-                    cv2.line(image, p1, p2, (255, 0, 255), 3)
+                    cv2.line(image, p1, p2, joint_color, 4 if has_target_pose else 2)
+            
+            # Draw keypoints
+            for i, (kp, visible) in enumerate(zip(detection_keypoints, joint_visible)):
+                if visible:
+                    kp_scaled = scale_coord(kp)
+                    radius = 6 if has_target_pose else 4
+                    cv2.circle(image, kp_scaled, radius, joint_color, -1)
+                    
+            # Highlight specific joints for target pose
+            if has_target_pose:
+                for joint_idx in [L_WRIST, R_WRIST, NOSE]:
+                    if joint_visible[joint_idx]:
+                        kp_scaled = scale_coord(detection_keypoints[joint_idx])
+                        cv2.circle(image, kp_scaled, 8, (0, 0, 255), 2)  # Red circle around key joints
+                        
     except:
         pass
 
@@ -91,7 +145,7 @@ def draw_predictions(request):
     try:
         with MappedArray(request, 'main') as m:
             if last_predictions:
-                visualize_pose_estimation_result(last_predictions, m.array, model_size)
+                visualize_pose_estimation_result(last_predictions, m.array, model_size, detection_threshold=0.3, joint_threshold=0.3)
     except:
         pass
 
@@ -110,6 +164,7 @@ def safe_subprocess_run(command, description="comando"):
 def trim_video_to_last_60_seconds(video_path):
     """Corta o vídeo para manter apenas os últimos 60 segundos"""
     try:
+        recording = False
         success, duration_str = safe_subprocess_run(
             f"ffprobe -v quiet -show_entries format=duration -of csv=p=0 {video_path}",
             "obter duração do vídeo"
@@ -187,7 +242,14 @@ def main_program():
         )
         picam2.configure(config)
         
-        bitrate = 10000000
+
+        ENABLE_PREVIEW = True
+        if ENABLE_PREVIEW:
+         from picamera2 import Preview
+         picam2.post_callback = draw_predictions
+         picam2.start_preview(Preview.QTGL)
+
+        bitrate = 2000000
         encoder = H264Encoder(bitrate=bitrate)
         seconds_to_buffer = 60
         buffer_size_bytes = int(bitrate / 8 * seconds_to_buffer)
@@ -195,7 +257,7 @@ def main_program():
         
         picam2.start_recording(encoder, circular_output)
         blink_led(3, 0.5)
-        print("🚀 Sistema iniciado. Aguardando detecção da pose...")
+        print("Sistema iniciado. Aguardando detecção da pose...")
         
         while True:
             try:
@@ -204,23 +266,46 @@ def main_program():
                 if frame is None:
                     continue
                 
-                # Atualiza contador de frames
-                frame_counter += 1
-                current_time = time.time()
+                # Debug: Print frame info once
+                if frame_counter == 0:
+                    print(f"Frame shape: {frame.shape}, Model size: {model_size}")
                 
-                # Verifica se está processando frames (debug a cada 900 frames ≈ 30s)
-                if frame_counter % 900 == 0:
-                    fps = 900 / (current_time - last_frame_time)
-                    print(f"✓ Sistema ativo - FPS: {fps:.1f}")
-                    last_frame_time = current_time
                 
                 # Processamento de detecção
                 raw_detections = hailo.run(frame)
                 if raw_detections is None:
                     continue
-                    
-                last_predictions = postproc_yolov8_pose(1, raw_detections, model_size)
+                
+                # Debug: Print raw detection shapes
+                frame_counter += 1
+                if frame_counter % 30 == 0:  # Print every 30 frames
+                    print(f"Frame {frame_counter}: Raw detections shapes:")
+                    for key, value in raw_detections.items():
+                        if isinstance(value, list):
+                            print(f"  {key}: list with {len(value)} items")
+                            for i, item in enumerate(value):
+                                print(f"    [{i}]: {item.shape}")
+                        else:
+                            print(f"  {key}: {value.shape}")
+                
+                try:
+                    last_predictions = postproc_yolov8_pose(1, raw_detections, model_size)
+                except Exception as e:
+                    if frame_counter % 30 == 0:
+                        print(f"Postprocessing error: {e}")
+                    last_predictions = None
                 pose_found_this_frame = False
+                
+                # Debug: Print predictions every 30 frames
+                if frame_counter % 30 == 0 and last_predictions:
+                    print(f"Predictions keys: {list(last_predictions.keys())}")
+                    if 'scores' in last_predictions and last_predictions['scores'][0] is not None:
+                        scores = last_predictions['scores'][0]
+                        num_detections = (scores > 0.1).sum()
+                        print(f"  Found {num_detections} detections with confidence > 0.1")
+                        if num_detections > 0:
+                            max_score = scores.max()
+                            print(f"  Highest confidence: {max_score:.3f}")
                 
                 if last_predictions and not recording:
                     try:
@@ -248,7 +333,7 @@ def main_program():
                     print(f"✅ Pose confirmada! Gravando...")
                     
                     led.on()
-                    time.sleep(1)
+                    time.sleep(2)
                     led.off()
                     
                     base_filename = datetime.now().strftime("gravacao_%Y-%m-%d_%H-%M-%S")
@@ -259,7 +344,7 @@ def main_program():
                         circular_output.fileoutput = h264_filename
                         circular_output.start()
                         circular_output.stop()
-                        
+                        recording = False
                         # Processa vídeo em thread separada
                         process_video_async(h264_filename, mp4_filename)
                         
