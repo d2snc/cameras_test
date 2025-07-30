@@ -5,6 +5,7 @@ import time
 from datetime import datetime
 import subprocess
 import os
+import numpy as np
 from gpiozero import LED
 from pose_utils import postproc_yolov8_pose
 from picamera2 import MappedArray, Picamera2
@@ -13,8 +14,22 @@ from picamera2.outputs import CircularOutput
 from picamera2.devices import Hailo
 import threading
 import queue
+import json
 
 led = LED(17)
+
+DEBUG_CONFIG_FILE = "/home/d2snc/Documents/cameras_test/debug_config.json"
+
+def load_debug_mode():
+    """Carrega o estado atual do modo DEBUG"""
+    try:
+        if os.path.exists(DEBUG_CONFIG_FILE):
+            with open(DEBUG_CONFIG_FILE, 'r') as f:
+                config = json.load(f)
+                return config.get('debug_mode', False)
+    except:
+        pass
+    return False
 
 def blink_led(times, duration):
     """Pisca o LED um número específico de vezes por uma duração"""
@@ -83,13 +98,25 @@ def check_arms_crossed_above_head(keypoints, joint_scores, threshold=0.6):
 def visualize_pose_estimation_result(results, image, model_size, detection_threshold=0.3, joint_threshold=0.3):
     global pose_detected_counter, recording
     try:
+        # Check if DEBUG mode is enabled
+        debug_mode = load_debug_mode()
+        
         image_size = (image.shape[1], image.shape[0])
         def scale_coord(coord): return tuple([int(c * t / f) for c, f, t in zip(coord, model_size, image_size)])
         
-        # Add status indicators
+        # Add status indicators (always show these for monitoring)
         status_color = (0, 255, 0) if recording else (255, 255, 255)
         status_text = "RECORDING" if recording else f"POSE COUNT: {pose_detected_counter}/{POSE_TRIGGER_FRAMES}"
         cv2.putText(image, status_text, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, status_color, 2)
+        
+        # Add DEBUG mode indicator
+        debug_color = (0, 255, 255) if debug_mode else (128, 128, 128)
+        debug_text = f"DEBUG: {'ON' if debug_mode else 'OFF'}"
+        cv2.putText(image, debug_text, (10, 70), cv2.FONT_HERSHEY_SIMPLEX, 0.7, debug_color, 2)
+        
+        # Skip pose visualization if DEBUG mode is off
+        if not debug_mode:
+            return
         
         if not results or 'bboxes' not in results: return
         bboxes, scores, keypoints, joint_scores = (results['bboxes'][0], results['scores'][0], results['keypoints'][0], results['joint_scores'][0])
@@ -243,11 +270,11 @@ def main_program():
         picam2.configure(config)
         
 
-        ENABLE_PREVIEW = True
-        if ENABLE_PREVIEW:
-         from picamera2 import Preview
-         picam2.post_callback = draw_predictions
-         picam2.start_preview(Preview.QTGL)
+        # ENABLE_PREVIEW = True
+        # if ENABLE_PREVIEW:
+        #  from picamera2 import Preview
+        #  picam2.post_callback = draw_predictions
+        #  picam2.start_preview(Preview.QTGL)
 
         bitrate = 2000000
         encoder = H264Encoder(bitrate=bitrate)
@@ -270,6 +297,27 @@ def main_program():
                 if frame_counter == 0:
                     print(f"Frame shape: {frame.shape}, Model size: {model_size}")
                 
+                # Image preprocessing for better YOLOv8m pose detection
+                try:
+                    # Apply CLAHE for contrast enhancement
+                    if len(frame.shape) == 3:
+                        # Convert to grayscale for CLAHE, then back to RGB
+                        gray = cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY)
+                        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
+                        enhanced_gray = clahe.apply(gray)
+                        frame = cv2.cvtColor(enhanced_gray, cv2.COLOR_GRAY2RGB)
+                    
+                    # Gamma correction for brightness adjustment
+                    gamma = 1.2
+                    frame = np.power(frame.astype(np.float32)/255.0, gamma) * 255.0
+                    frame = frame.astype(np.uint8)
+                    
+                    # Light Gaussian blur to reduce noise
+                    frame = cv2.GaussianBlur(frame, (3,3), 0)
+                    
+                except Exception as e:
+                    # If preprocessing fails, use original frame
+                    pass
                 
                 # Processamento de detecção
                 raw_detections = hailo.run(frame)

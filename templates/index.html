@@ -49,11 +49,69 @@
             font-size: 1.2em;
             padding: 40px;
         }
+        .debug-control {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .debug-toggle {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 1.1em;
+        }
+        .toggle-switch {
+            position: relative;
+            width: 60px;
+            height: 30px;
+            background-color: #ccc;
+            border-radius: 15px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        .toggle-switch.active {
+            background-color: #28a745;
+        }
+        .toggle-slider {
+            position: absolute;
+            top: 3px;
+            left: 3px;
+            width: 24px;
+            height: 24px;
+            background-color: white;
+            border-radius: 50%;
+            transition: transform 0.3s;
+        }
+        .toggle-switch.active .toggle-slider {
+            transform: translateX(30px);
+        }
+        .debug-status {
+            margin-top: 10px;
+            font-weight: bold;
+        }
+        .debug-on { color: #28a745; }
+        .debug-off { color: #dc3545; }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>Vídeos Gravados</h1>
+        
+        <div class="debug-control">
+            <div class="debug-toggle">
+                <span>Modo DEBUG:</span>
+                <div class="toggle-switch {{ 'active' if debug_mode else '' }}" id="debugToggle">
+                    <div class="toggle-slider"></div>
+                </div>
+            </div>
+            <div class="debug-status">
+                <span id="debugStatus" class="{{ 'debug-on' if debug_mode else 'debug-off' }}">
+                    {{ 'ATIVADO - Vídeos com skeleton/keypoints' if debug_mode else 'DESATIVADO - Vídeos sem visualizações' }}
+                </span>
+            </div>
+        </div>
         
         {% if videos %}
             {% for video in videos %}
@@ -71,5 +129,40 @@
             </div>
         {% endif %}
     </div>
+
+    <script>
+        const debugToggle = document.getElementById('debugToggle');
+        const debugStatus = document.getElementById('debugStatus');
+
+        debugToggle.addEventListener('click', async function() {
+            const isActive = debugToggle.classList.contains('active');
+            
+            try {
+                const response = await fetch('/toggle_debug', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ debug: !isActive })
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    
+                    if (result.debug) {
+                        debugToggle.classList.add('active');
+                        debugStatus.textContent = 'ATIVADO - Vídeos com skeleton/keypoints';
+                        debugStatus.className = 'debug-on';
+                    } else {
+                        debugToggle.classList.remove('active');
+                        debugStatus.textContent = 'DESATIVADO - Vídeos sem visualizações';
+                        debugStatus.className = 'debug-off';
+                    }
+                }
+            } catch (error) {
+                console.error('Erro ao alterar modo DEBUG:', error);
+            }
+        });
+    </script>
 </body>
 </html>
