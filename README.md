@@ -6,6 +6,7 @@ Dois scripts são fundamentais para o funcionamento da câmera, que é o pose_re
 
 Para configurar para iniciar assim que o pc iniciar, coloque a seguinte configuração após dar o comando 'crontab -e':
 
+SHELL=/bin/bash
 @reboot sh /home/d2snc/Documents/cameras_test/start_pose_recorder.sh > /home/d2snc/Documents/cameras_test/logs/cronlog 2>&1
 @reboot sh /home/d2snc/Documents/cameras_test/start_web_server.sh > /home/d2snc/Documents/cameras_test/logs/cronlog 2>&1
 
