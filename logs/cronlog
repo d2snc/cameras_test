@@ -1,2 +1,3369 @@
-Ativando ambiente Hailo para o gravador de pose...
-Iniciando o script pose_recorder.py...
+/home/d2snc/Documents/cameras_test/start_web_server.sh: 6: cd: can't cd to /home/d2snc/Documents/camera_test/
+Ativando ambiente Hailo para o servidor web...
+/home/d2snc/Do[0:00:15.197741044] [866] [1;32m INFO [1;37mCamera [1;34mcamera_manager.cpp:326 [0mlibcamera v0.5.0+59-d83ff0a4
+[0:00:15.204738507] [1673] [1;32m INFO [1;37mRPI [1;34mpisp.cpp:720 [0mlibpisp version v1.2.1 981977ff21f3 29-04-2025 (14:13:50)
+[0:00:15.214504415] [1673] [1;32m INFO [1;37mRPI [1;34mpisp.cpp:1179 [0mRegistered camera /base/axi/pcie@1000120000/rp1/i2c@88000/imx477@1a to CFE device /dev/media3 and ISP device /dev/media0 using PiSP variant BCM2712_C0
+[0:00:15.217485063] [866] [1;32m INFO [1;37mCamera [1;34mcamera.cpp:1205 [0mconfiguring streams: (0) 1280x720-XRGB8888 (1) 640x640-RGB888 (2) 2028x1080-BGGR_PISP_COMP1
+[0:00:15.217585359] [1673] [1;32m INFO [1;37mRPI [1;34mpisp.cpp:1483 [0mSensor: /base/axi/pcie@1000120000/rp1/i2c@88000/imx477@1a - Selected sensor format: 2028x1080-SBGGR12_1X12 - Selected CFE format: 2028x1080-PC1B
+Sistema iniciado. Aguardando detecção da pose...
+Frame shape: (640, 640, 3), Model size: (640, 640)
+Frame 30: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 60: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 90: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 120: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 150: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 180: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 210: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 240: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 270: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 300: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 330: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 360: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 390: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 420: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 450: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 480: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 510: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 540: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 570: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 600: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 630: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 660: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 690: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 720: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 750: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 780: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 810: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 840: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 870: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 900: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 930: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 960: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 990: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 1020: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 1050: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 1080: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 1110: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 1140: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 1170: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 1200: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 1230: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 1260: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 1290: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 1320: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 1350: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 1380: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 1410: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 1440: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 1470: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 1500: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 1530: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 1560: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 1590: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 1620: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 1650: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 1680: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 1710: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 1740: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 1770: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 1800: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 1830: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 1860: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 1890: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 1920: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 1950: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 1980: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 2010: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 2040: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 2070: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 2100: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 2130: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 2160: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 2190: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 2220: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 2250: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 2280: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 2310: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 2340: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 2370: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 2400: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 2430: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 2460: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 2490: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 2520: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 2550: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 2580: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 2610: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 2640: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 2670: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 2700: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 2730: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 2760: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 2790: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 2820: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 2850: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 2880: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 2910: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 2940: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 2970: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 3000: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 3030: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 3060: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 3090: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 3120: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 3150: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 3180: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 3210: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 3240: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 3270: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 3300: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 3330: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 3360: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 3390: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 3420: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 3450: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 3480: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 3510: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 3540: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 3570: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 3600: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 3630: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 3660: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 3690: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 3720: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 3750: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 3780: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 3810: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 3840: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 3870: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 3900: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 3930: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 3960: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 3990: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 4020: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 4050: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 4080: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 4110: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 4140: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 4170: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 4200: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 4230: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 4260: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 4290: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 4320: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 4350: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 4380: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 4410: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 4440: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 4470: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 4500: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 4530: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 4560: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 4590: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 4620: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 4650: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 4680: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 4710: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 4740: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 4770: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 4800: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 4830: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 4860: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 4890: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 4920: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 4950: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 4980: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 1 detections with confidence > 0.1
+  Highest confidence: 0.102
+Frame 5010: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 5040: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 5070: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 5100: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 5130: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 5160: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 5190: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 5220: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 5250: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 5280: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 5310: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 5340: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 5370: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 5400: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 5430: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 5460: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 5490: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 5520: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 5550: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 5580: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 5610: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 5640: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 5670: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 1 detections with confidence > 0.1
+  Highest confidence: 0.114
+Frame 5700: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 5730: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 5760: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 5790: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 5820: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 5850: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 5880: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 5910: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 5940: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 5970: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 6000: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 6030: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 6060: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 6090: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 6120: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 6150: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 6180: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 6210: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 6240: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 6270: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 6300: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 6330: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 6360: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 6390: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 6420: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 6450: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 6480: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 6510: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 6540: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 6570: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 6600: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 6630: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 6660: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 6690: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 6720: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 6750: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 6780: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 6810: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 6840: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 6870: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 6900: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 6930: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 6960: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 6990: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 7020: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 7050: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 7080: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 7110: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 7140: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 7170: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 7200: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 7230: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 7260: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 7290: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 7320: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 7350: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 7380: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 7410: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 7440: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 7470: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 7500: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 7530: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 7560: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 7590: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 7620: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 7650: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 7680: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 7710: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 7740: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 7770: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 7800: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 7830: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 7860: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 7890: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 7920: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 7950: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 7980: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 8010: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 8040: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 8070: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 8100: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 8130: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 8160: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 8190: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 8220: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 8250: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 8280: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 8310: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 8340: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 8370: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)
+Predictions keys: ['bboxes', 'keypoints', 'joint_scores', 'scores']
+  Found 0 detections with confidence > 0.1
+Frame 8400: Raw detections shapes:
+  yolov8m_pose/conv90: (20, 20, 64)
+  yolov8m_pose/conv91: (20, 20, 1)
+  yolov8m_pose/conv92: (20, 20, 51)
+  yolov8m_pose/conv75: (40, 40, 64)
+  yolov8m_pose/conv76: (40, 40, 1)
+  yolov8m_pose/conv77: (40, 40, 51)
+  yolov8m_pose/conv59: (80, 80, 64)
+  yolov8m_pose/conv60: (80, 80, 1)
+  yolov8m_pose/conv61: (80, 80, 51)

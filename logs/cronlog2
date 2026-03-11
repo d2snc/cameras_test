@@ -6,9 +6,14 @@ Iniciando o script web_server.py...
 Verifique o IP do seu Raspberry Pi com o comando 'hostname -I'
  * Serving Flask app 'web_server'
  * Debug mode: off
-WARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.
- * Running on all addresses (0.0.0.0)
- * Running on http://127.0.0.1:8000
- * Running on http://127.0.0.1:8000
-Press CTRL+C to quit
-Killed
+Traceback (most recent call last):
+  File "/home/d2snc/Documents/cameras_test/web_server.py", line 84, in <module>
+    app.run(host='0.0.0.0', port=8000)
+  File "/usr/lib/python3/dist-packages/flask/app.py", line 1188, in run
+    run_simple(t.cast(str, host), port, self, **options)
+  File "/usr/lib/python3/dist-packages/werkzeug/serving.py", line 1065, in run_simple
+    s = prepare_socket(hostname, port)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3/dist-packages/werkzeug/serving.py", line 932, in prepare_socket
+    s.listen(LISTEN_QUEUE)
+OSError: [Errno 98] Address already in use

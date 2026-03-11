@@ -270,11 +270,11 @@ def main_program():
         picam2.configure(config)
         
 
-        # ENABLE_PREVIEW = True
-        # if ENABLE_PREVIEW:
-        #  from picamera2 import Preview
-        #  picam2.post_callback = draw_predictions
-        #  picam2.start_preview(Preview.QTGL)
+        ENABLE_PREVIEW = False
+        if ENABLE_PREVIEW:
+         from picamera2 import Preview
+         picam2.post_callback = draw_predictions
+         picam2.start_preview(Preview.QTGL)
 
         bitrate = 2000000
         encoder = H264Encoder(bitrate=bitrate)
